@@ -76,7 +76,7 @@ Early feedback shapes the roadmap.
 
 ```bash
 # Clone
-git clone https://github.com/yourusername/tinlance-threatfade.git
+git clone https://github.com/lloydcoder/tinlance-threatfade.git
 cd tinlance-threatfade
 
 # Virtual environment
