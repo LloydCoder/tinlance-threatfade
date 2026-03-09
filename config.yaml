@@ -1,0 +1,19 @@
+fade_detection:
+  entropy_window: 8
+  min_points: 12
+  threshold: 0.42
+  drop_weight: 0.65
+  entropy_weight: 0.25
+  zscore_weight: 0.1
+  rule_threshold: 2
+
+branding:
+  name: ThreatFade
+  company: Tinlance Limited
+  version: 1.0.0-beta
+
+telegram:
+  # Use environment variables or set directly
+  # bot_token and chat_id will fall back to env vars if not set here
+  bot_token: YOUR_BOT_TOKEN_HERE
+  chat_id: YOUR_CHAT_ID_HERE
