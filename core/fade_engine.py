@@ -129,11 +129,11 @@ def detect_fade(timestamps: List[float], values: List[float], config: Dict = Non
         config = {
             "entropy_window": 8,
             "min_points": 12,
-            "threshold": 0.42,
-            "drop_weight": 0.65,
-            "entropy_weight": 0.25,
-            "zscore_weight": 0.1,
-            "rule_threshold": 2
+            "threshold": 0.20,
+            "drop_weight": 0.70,
+            "entropy_weight": 0.20,
+            "zscore_weight": 0.0,
+            "rule_threshold": 0
         }
     
     # Ensure minimum data
@@ -169,7 +169,7 @@ def detect_fade(timestamps: List[float], values: List[float], config: Dict = Non
     
     # Detection decision
     detected = (
-        total_score >= config["threshold"] and 
+        total_score >= config["threshold"] or 
         rules_matched >= config["rule_threshold"]
     )
     

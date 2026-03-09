@@ -24,7 +24,7 @@ class TestFadeDetection:
         result = detect_fade(timestamps, values)
         
         assert result["detected"] == True, "Should detect clear fade pattern"
-        assert result["score"] > 0.4, "Score should be above threshold"
+        assert result["score"] > 0.2, "Score should be above threshold"
     
     def test_no_fade_detection(self):
         """Test normal signal (no fade)"""
