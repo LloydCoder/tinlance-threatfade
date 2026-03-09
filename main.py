@@ -96,7 +96,7 @@ if args.export:
     report_data = {
         "timestamp": datetime.now().isoformat(),
         "scenario": args.scenario,
-        "detected": result["detected"],
+        "detected": bool(result["detected"]),
         "score": result["score"],
         "entropy": result["entropy"],
         "drop_ratio": result["drop_ratio"],
