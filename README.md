@@ -151,11 +151,11 @@ Proprietary extensions (satellite fusion, hardware, enterprise federation, offen
 ## Contact & Community
 
 - **GitHub Issues:** Bug reports, feature requests
-- **Twitter:** @lloydambition
-- **Email:** tinlance@protonmail.com (placeholder)
+- **Twitter:** @Lloydcoder
+- **Email:** Lloydcoder@protonmail.com (placeholder)
 
 ---
 
-**Built by:** LloydAmbition (@lloydambition)  
+**Built by:** Lloydcoder (@Lloydcoder)  
 **Organization:** Tinlance Limited  
 **Nigeria-1. World-0. 💚**
