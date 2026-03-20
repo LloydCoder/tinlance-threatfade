@@ -43,6 +43,10 @@ parser.add_argument(
     action="store_true",
     help="Export JSON + PNG reports to reports/ folder"
 )
+parser.add_argument(
+    "--data",
+    help="JSON file with timestamps/values"
+)
 
 args = parser.parse_args()
 
@@ -54,9 +58,28 @@ print(f"{Fore.CYAN}{Style.BRIGHT}║  Evasion Interception Platform             
 print(f"{Fore.CYAN}{Style.BRIGHT}╚══════════════════════════════════════════════╝{Style.RESET_ALL}\n")
 print(f"{Fore.YELLOW}Early Research MVP – Simulated Data Only{Style.RESET_ALL}\n")
 
-# Generate signals
-print(f"{Fore.CYAN}[*] Generating {args.scenario} scenario...{Style.RESET_ALL}")
-timestamps, values = generate_signals(args.scenario)
+# Generate signals or load from JSON
+if args.data:
+    print(f"{Fore.CYAN}[*] Loading signal data from {args.data}...{Style.RESET_ALL}")
+    with open(args.data, "r") as f:
+        data = json.load(f)
+    # Convert timestamps - handle both string and numeric formats
+    timestamps = []
+    for t in data["timestamps"]:
+        if isinstance(t, str):
+            try:
+                timestamps.append(datetime.fromisoformat(t))
+            except:
+                timestamps.append(datetime.fromtimestamp(float(t)))
+        else:
+            timestamps.append(datetime.fromtimestamp(float(t)))
+    values = data["values"]
+    scenario_name = "json_data"
+else:
+    print(f"{Fore.CYAN}[*] Generating {args.scenario} scenario...{Style.RESET_ALL}")
+    timestamps, values = generate_signals(args.scenario)
+    scenario_name = args.scenario
+
 print(f"{Fore.GREEN}[✓] Generated {len(values)} signal points{Style.RESET_ALL}\n")
 
 # Detect fade
@@ -88,14 +111,14 @@ print(f"{Fore.YELLOW}{'='*50}{Style.RESET_ALL}\n")
 
 # Save visualization
 print(f"{Fore.CYAN}[*] Generating visualization...{Style.RESET_ALL}")
-plot_path = save_plot(timestamps, values, result, args.scenario)
+plot_path = save_plot(timestamps, values, result, scenario_name)
 print(f"{Fore.GREEN}[✓] Visualization saved: {plot_path}{Style.RESET_ALL}\n")
 
 # Save JSON report
 if args.export:
     report_data = {
         "timestamp": datetime.now().isoformat(),
-        "scenario": args.scenario,
+        "scenario": scenario_name,
         "detected": bool(result["detected"]),
         "score": result["score"],
         "entropy": result["entropy"],
