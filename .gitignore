@@ -1,43 +1,30 @@
-# Python
-venv/
-env/
-.venv/
 __pycache__/
 *.pyc
 *.pyo
-*.pyd
-.Python
 *.egg-info/
 dist/
 build/
-
-# IDE
+venv/
+env/
+.venv/
 .vscode/
 .idea/
 *.swp
-*.swo
 *~
-.DS_Store
-
-# Logs
-*.log
-threatfade.log
-
-# Reports & outputs
-reports/*
-!reports/.gitkeep
-
-# Secrets
 .env
 .env.local
 *.key
 *.pem
-
-# OS
+data/pcaps/*.pcap
+data/pcaps/*.pcapng
+data/pcaps/*.zip
 .DS_Store
 Thumbs.db
-
-# Testing
+*.log
+wget-log*
 .pytest_cache/
 .coverage
 htmlcov/
+reports/*.png
+reports/*.json
+!reports/.gitkeep
