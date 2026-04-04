@@ -80,6 +80,8 @@ Tested on real malware traffic from Active Countermeasures:
 | Source | Packets | Sessions | Detected | Z-Score | Confidence | MITRE TTP |
 |--------|---------|----------|----------|---------|------------|-----------|
 | Merlin QUIC C2 | 490,565 | 521 | YES | 14.76 | HIGH | T1027 |
+| Cobalt Strike | Real PCAP | - | YES | 7.01 | MEDIUM | - |
+| IcedID | Real PCAP | - | YES | 3.89 | LOW | - |
 
 False-positive baseline: **0%** across 5 normal traffic patterns (100 test runs).
 
