@@ -1,0 +1,21 @@
+{
+  "tool": "ThreatFade",
+  "version": "0.2.0-beta",
+  "exported_at": "2026-04-04T23:32:00.547296",
+  "total_events": 1,
+  "events": [
+    {
+      "detected": true,
+      "score": 0.3260908501844837,
+      "confidence": "medium",
+      "entropy": 1.1418502428489794,
+      "drop_ratio": 0.0,
+      "z_outlier": 7.013793723469082,
+      "fade_start": 42,
+      "rules_matched": 0,
+      "entropy_score": 0.6193832523836735,
+      "drop_score": 0.0,
+      "zscore_score": 0.7013793723469082
+    }
+  ]
+}
