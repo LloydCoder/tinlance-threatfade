@@ -21,32 +21,57 @@ pip install -r requirements.txt
 python main.py
 
 # Run directly on a PCAP file
-python main.py --pcap path/to/capture.pcapng --export
+python main.py --pcap path/to/capture.pcapng --export json
 
-# Run on pre-converted JSON signals
-python main.py --data real_c2_signal.json --export
-
-# Specific scenario
-python main.py --scenario c2_quieting --export
+# Export to different SIEM formats
+python main.py --scenario c2_quieting --export splunk
+python main.py --scenario c2_quieting --export cef
+python main.py --scenario c2_quieting --export csv
 ```
 
 ## What It Does
 
 ThreatFade analyses network signals (from simulation or real PCAP captures) and flags fade events — periods where an adversary deliberately reduces or hides their footprint.
 
-**Detection pipeline:** Raw signal → rolling Shannon entropy → z-score outlier detection → heuristic rule matching → confidence scoring → MITRE TTP classification → alert + visualization.
+**Detection pipeline:** Raw signal → rolling Shannon entropy → z-score outlier detection → heuristic rule matching → confidence scoring → MITRE TTP classification → SIEM export + alert + visualization.
 
 **Current capabilities:**
 
 - Direct PCAP/PCAPNG ingestion (via --pcap flag)
 - 5 simulated threat scenarios (C2 quieting, LOTL gradual, GNSS jam, mixed, normal-with-fade)
 - Confidence scoring (critical / high / medium / low / info)
+- SIEM export to JSON, Splunk HEC, CEF syslog, and CSV
 - MITRE ATT&CK TTP stub mapping
 - Volatility memory artifact simulation (reference)
 - Dark-mode PNG timeline visualization
-- JSON report export
 - Telegram alerts with attached visualization
 - Runs completely offline
+
+## SIEM Integration
+
+ThreatFade exports detection results directly to common SIEM formats. No additional tooling required.
+
+**JSON (default)** — structured report for Splunk, ELK, or custom pipelines:
+```bash
+python main.py --pcap capture.pcapng --export json
+```
+
+**Splunk HEC** — ready for HTTP Event Collector ingestion:
+```bash
+python main.py --pcap capture.pcapng --export splunk
+```
+
+**CEF** — Common Event Format for syslog-based SIEMs (ArcSight, QRadar):
+```bash
+python main.py --pcap capture.pcapng --export cef
+```
+
+**CSV** — for spreadsheet analysis or custom tooling:
+```bash
+python main.py --pcap capture.pcapng --export csv
+```
+
+All exports are saved to `reports/siem/` with timestamped filenames.
 
 ## Real-World Validation
 
@@ -56,58 +81,64 @@ Tested on real malware traffic from Active Countermeasures:
 |--------|---------|----------|----------|---------|------------|-----------|
 | Merlin QUIC C2 | 490,565 | 521 | YES | 14.76 | HIGH | T1027 |
 
-The Merlin QUIC capture contains 24 hours of real C2 beacon traffic with periodic quieting. ThreatFade flagged the evasion pattern with a z-score outlier of 14.76, well above the statistical significance threshold.
-
-False-positive testing on baseline traffic is in progress.
+False-positive baseline: **0%** across 5 normal traffic patterns (100 test runs).
 
 ## Architecture
 ```
-main.py                    Entry point, CLI, PCAP ingestion
-core/fade_engine.py        Detection logic (entropy + z-score + rules + confidence)
-agents/signal_generator.py Multi-scenario signal simulation
-viz/timeline_plot.py       Dark-mode PNG visualization
-mitre/rule_parser.py       MITRE TTP stub matching
-volatility/memory_sim.py   Volatility artifact simulation (reference)
-alerts/telegram_alert.py   Telegram alert integration
+main.py                      Entry point, CLI, PCAP ingestion
+core/fade_engine.py          Detection logic (entropy + z-score + rules + confidence)
+core/siem_exporter.py        SIEM export (JSON, Splunk HEC, CEF, CSV)
+agents/signal_generator.py   Multi-scenario signal simulation
+viz/timeline_plot.py         Dark-mode PNG visualization
+mitre/rule_parser.py         MITRE TTP stub matching
+volatility/memory_sim.py     Volatility artifact simulation (reference)
+alerts/telegram_alert.py     Telegram alert integration
 ```
 
 ## Testing
 ```bash
+# Unit tests (22 tests covering detection, confidence, edge cases)
 pytest test_fade_engine.py -v
+
+# False-positive baseline (5 normal traffic patterns, 100 runs)
 python test_false_positives.py
 ```
 
-The test suite covers detection accuracy, confidence scoring, edge cases, and custom configuration. The false-positive baseline runs 100 tests across 5 normal traffic patterns.
+## Q2 2026 Progress
 
-## Limitations
-
-This is an early research prototype. Be aware of:
-
-- **Real-world accuracy:** Validated on 1 real PCAP so far. False-positive rate on normal traffic is being measured.
-- **MITRE mapping:** Stub implementation. Maps to broad TTPs, not specific sub-techniques.
-- **Volatility integration:** Simulated artifacts only. No real memory dump parsing yet.
-- **Alerting:** Telegram only. SIEM export (Splunk, ELK) planned for Q2.
-- **Scale:** Tested on datasets under 1 GB. Performance on larger captures is untested.
+| Milestone | Status |
+|-----------|--------|
+| Real PCAP ingestion | ✅ Complete |
+| Confidence scoring | ✅ Complete |
+| False-positive baseline (0%) | ✅ Complete |
+| SIEM export (JSON/Splunk/CEF/CSV) | ✅ Complete |
+| Endpoint agent stubs (Linux/Windows) | In progress |
+| First 50-100 beta testers | In progress |
 
 ## Roadmap
-
-**Q2 2026:** False-positive baseline testing, SIEM export (JSON to Splunk HEC / ELK), endpoint agent stubs (Linux/Windows).
 
 **Q3 2026:** Full MITRE sub-technique mapping, satellite signal fusion (proof of concept), rugged hardware integration stubs.
 
 **Q4 2026:** Enterprise multi-tenant federation, performance optimization for large-scale captures, quantum-resistant transport layer.
 
+## Limitations
+
+- **Real-world accuracy:** Validated on 1 real PCAP. FP rate 0% on synthetic normal traffic.
+- **MITRE mapping:** Stub implementation (broad TTPs, not sub-techniques).
+- **Volatility:** Simulated artifacts only. No real memory dump parsing yet.
+- **Scale:** Tested on datasets under 1 GB.
+
 ## Configuration
 
-Detection thresholds can be tuned via config.yaml. For Telegram alerts, copy .env.example to .env and fill in your bot token and chat ID.
+Detection thresholds: `config.yaml`. Telegram alerts: copy `.env.example` to `.env` and fill in your bot token.
 
 ## Contributing
 
-Found a bug? Want to improve detection logic? Open an issue or pull request. Early feedback shapes the roadmap. See CONTRIBUTING.md for guidelines.
+Found a bug? Want to improve detection logic? Open an issue or pull request. See CONTRIBUTING.md for guidelines.
 
 ## License
 
-Apache 2.0 for the open-core base. Proprietary extensions (satellite fusion, hardware integration, enterprise federation, offensive simulation) are reserved to Tinlance Limited.
+Apache 2.0 for the open-core base. Proprietary extensions reserved to Tinlance Limited.
 
 ## Contact
 
