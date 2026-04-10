@@ -79,9 +79,9 @@ Tested on real malware traffic from Active Countermeasures:
 
 | Source | Packets | Sessions | Detected | Z-Score | Confidence | MITRE TTP |
 |--------|---------|----------|----------|---------|------------|-----------|
-| Merlin QUIC C2 | 490,565 | 521 | YES | 14.76 | HIGH | T1027 |
-| Cobalt Strike | Real PCAP | - | YES | 7.01 | MEDIUM | - |
-| IcedID | Real PCAP | - | YES | 3.89 | LOW | - |
+| Merlin QUIC C2 | 490,565 | 521 | YES | 14.76 | HIGH | T1573.002 |
+| Cobalt Strike | Real PCAP | - | YES | 7.01 | MEDIUM | T1027 |
+| IcedID | Real PCAP | - | YES | 3.89 | LOW | T1027 |
 
 False-positive baseline: **0%** across 5 normal traffic patterns (100 test runs).
 
@@ -95,7 +95,22 @@ viz/timeline_plot.py         Dark-mode PNG visualization
 mitre/rule_parser.py         MITRE TTP stub matching
 volatility/memory_sim.py     Volatility artifact simulation (reference)
 alerts/telegram_alert.py     Telegram alert integration
+agents/endpoint_agent.py     Endpoint agent stub (Linux/Windows)
 ```
+
+## Endpoint Agent
+
+Lightweight agent that monitors local network connections or process activity and runs fade detection.
+
+```bash
+# Monitor network connections for 60 seconds
+python agents/endpoint_agent.py --mode network --duration 60 --interval 5 --export json
+
+# Monitor process activity
+python agents/endpoint_agent.py --mode process --duration 60 --interval 5 --export cef
+```
+
+Supports Linux, Windows, and macOS. Exports to all SIEM formats.
 
 ## Testing
 ```bash
@@ -114,7 +129,7 @@ python test_false_positives.py
 | Confidence scoring | ✅ Complete |
 | False-positive baseline (0%) | ✅ Complete |
 | SIEM export (JSON/Splunk/CEF/CSV) | ✅ Complete |
-| Endpoint agent stubs (Linux/Windows) | In progress |
+| Endpoint agent stubs (Linux/Windows) | ✅ Complete |
 | First 50-100 beta testers | In progress |
 
 ## Roadmap
@@ -125,7 +140,7 @@ python test_false_positives.py
 
 ## Limitations
 
-- **Real-world accuracy:** Validated on 1 real PCAP. FP rate 0% on synthetic normal traffic.
+- **Real-world accuracy:** Validated on 3 real PCAPs (Merlin QUIC, Cobalt Strike, IcedID). FP rate 0% on synthetic normal traffic.
 - **MITRE mapping:** Stub implementation (broad TTPs, not sub-techniques).
 - **Volatility:** Simulated artifacts only. No real memory dump parsing yet.
 - **Scale:** Tested on datasets under 1 GB.
