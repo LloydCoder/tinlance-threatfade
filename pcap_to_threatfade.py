@@ -67,14 +67,32 @@ def pcap_to_signals(pcap_path):
     return timestamps, entropy_values
 
 # Run
-pcap_file = "data/pcaps/merlin_quic.pcapng"
-print(f"\n[*] Converting {pcap_file} to ThreatFade signals...\n")
-ts, vals = pcap_to_signals(pcap_file)
 
-# Save as JSON for ThreatFade
-data = {"timestamps": ts, "values": vals}
-with open("real_c2_signal.json", "w") as f:
-    json.dump(data, f, indent=2)
 
-print(f"[✓] Saved {len(vals)} entropy points to real_c2_signal.json")
-print(f"[*] Now run: python main.py --data real_c2_signal.json --export\n")
+
+def parse_pcap(pcap_path: str):
+    """
+    API-friendly wrapper around pcap_to_signals().
+    Returns (timestamps_as_datetime_list, values_as_float_list)
+    ready for detect_fade() consumption.
+    Called by fusionops_api.py /detect/pcap endpoint.
+    """
+    ts_strings, values = pcap_to_signals(pcap_path)
+    timestamps = [datetime.fromisoformat(t) for t in ts_strings]
+    if len(timestamps) < 10:
+        raise ValueError(
+            f"PCAP produced only {len(timestamps)} time windows — "
+            "file may be too small or contain no sessions with payload data."
+        )
+    return timestamps, values
+
+if __name__ == "__main__":
+    pcap_file = "data/pcaps/merlin_quic.pcapng"
+    print(f"\n[*] Converting {pcap_file} to ThreatFade signals...\n")
+    ts, vals = pcap_to_signals(pcap_file)
+    # Save as JSON for ThreatFade
+    data = {"timestamps": ts, "values": vals}
+    with open("real_c2_signal.json", "w") as f:
+        json.dump(data, f, indent=2)
+    print(f"[✓] Saved {len(vals)} entropy points to real_c2_signal.json")
+    print(f"[*] Now run: python main.py --data real_c2_signal.json --export\n")
