@@ -10,7 +10,8 @@ from datetime import datetime
 import argparse
 import yaml
 from agents.signal_generator import generate_signals
-from core.fade_engine import detect_fade
+from core.fade_engine import detect_fade, detect_fade_with_ml
+from core.ml_stub import MLDetector, is_ml_available
 from viz.timeline_plot import save_plot
 from mitre.rule_parser import match_mitre_ttp, get_mitre_description
 from volatility.memory_sim import simulate_volatility_dump
@@ -23,6 +24,7 @@ parser = argparse.ArgumentParser(description="ThreatFade™ MVP – Tinlance Lim
 parser.add_argument("--scenario", choices=["c2_quieting", "lotl_gradual", "gnss_jam", "normal_with_fade", "mixed"], default="mixed")
 parser.add_argument("--data", help="Path to signal JSON file")
 parser.add_argument("--export", choices=["none", "json", "cef", "syslog"], default="none")
+parser.add_argument("--use-ml", action="store_true", help="Enable ML anomaly detection layer (Isolation Forest)")
 args = parser.parse_args()
 
 print(f"{Fore.CYAN}{Style.BRIGHT}ThreatFade™ v{CONFIG['branding']['version']} – {CONFIG['branding']['company']}{Style.RESET_ALL}")
@@ -37,7 +39,15 @@ if args.data:
 else:
     timestamps, values = generate_signals(args.scenario)
 
-result = detect_fade(timestamps, values)
+if args.use_ml and is_ml_available():
+    ml = MLDetector()
+    if not ml.trained:
+        print(f"{Fore.CYAN}[*] Training ML model on simulation data ...{Style.RESET_ALL}")
+        ml.train_from_generator()
+    result = detect_fade_with_ml(timestamps, values, ml_detector=ml)
+    print(f"{Fore.GREEN}[+] ML layer active (score: {result['ml_score']:.4f}, anomaly: {result['ml_anomaly']}){Style.RESET_ALL}")
+else:
+    result = detect_fade(timestamps, values)
 
 mitre_ttp = match_mitre_ttp(result) if result.get("detected", False) else "No match"
 mitre_description = get_mitre_description(mitre_ttp) if mitre_ttp != "No match" else ""

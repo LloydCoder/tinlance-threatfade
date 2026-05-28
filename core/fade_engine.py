@@ -136,3 +136,52 @@ def detect_fade(timestamps, values, config=None):
         "entropy_score": float(entropy_score), "drop_score": float(drop_score),
         "zscore_score": float(zscore_score),
     }
+
+
+def detect_fade_with_ml(timestamps, values, config=None, ml_detector=None):
+    """
+    Extended fade detection with optional ML layer.
+    Combines rule-based detection with Isolation Forest anomaly score.
+    
+    Args:
+        timestamps: List of timestamps.
+        values: List of signal values.
+        config: Detection configuration (optional).
+        ml_detector: MLDetector instance (optional).
+    
+    Returns:
+        Detection result with additional ml_score, ml_anomaly, combined_confidence.
+    """
+    result = detect_fade(timestamps, values, config)
+
+    ml_score = 0.0
+    ml_anomaly = False
+    ml_available = False
+
+    if ml_detector is not None:
+        try:
+            ml_score, ml_anomaly = ml_detector.predict(values)
+            ml_available = True
+        except Exception:
+            ml_score = 0.0
+            ml_anomaly = False
+
+    result["ml_score"] = float(ml_score)
+    result["ml_anomaly"] = bool(ml_anomaly)
+    result["ml_available"] = bool(ml_available)
+
+    # Combined confidence using both rule-based and ML
+    if ml_available and ml_anomaly and result["detected"]:
+        score = result["score"]
+        if score >= 0.4 or ml_score >= 0.6:
+            result["combined_confidence"] = "critical"
+        elif score >= 0.25 or ml_score >= 0.4:
+            result["combined_confidence"] = "high"
+        else:
+            result["combined_confidence"] = "medium"
+    elif result["detected"]:
+        result["combined_confidence"] = result["confidence"]
+    else:
+        result["combined_confidence"] = "info"
+
+    return result
