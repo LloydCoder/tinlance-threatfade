@@ -130,6 +130,7 @@ python test_false_positives.py
 | False-positive baseline (0%) | ✅ Complete |
 | SIEM export (JSON/Splunk/CEF/CSV) | ✅ Complete |
 | Endpoint agent stubs (Linux/Windows) | ✅ Complete |
+| ML anomaly layer (Isolation Forest) | ✅ Complete |
 | First 50-100 beta testers | In progress |
 
 ## Roadmap
