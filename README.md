@@ -195,3 +195,27 @@ Apache 2.0 for the open-core base. Proprietary extensions reserved to Tinlance L
 
 Built by Nwachukwu Chinaemerem ([@lloydcoder](https://github.com/LloydCoder))
 Tinlance Limited — Nigeria
+
+## Q3 2026 Progress
+
+| Milestone | Status |
+|-----------|--------|
+| REST API (FastAPI) | ✅ Complete |
+| Live network monitoring | ✅ Complete |
+| Alert deduplication | ✅ Complete |
+| Full MITRE ATT&CK v14 mapping | ✅ Complete |
+| Satellite Signal Fusion (AIS/ADS-B/GPS) | ✅ Complete |
+| Web dashboard (dark cyberpunk UI) | ✅ Complete |
+| Multi-agent coordination | ✅ Complete |
+
+## Beta Validation
+
+**Case Study #001** — Engr Uzoma (Cybersecurity Expert, Forex Engineer, Full Stack Developer):
+> "I've tested all scenarios as asked and I found no bugs. Everything passed. It's solid."
+
+See [docs/CASE_STUDY_001.md](docs/CASE_STUDY_001.md) for full details.
+
+## Live Integrations
+
+ThreatFade's REST API is consumed by:
+- **FusionOps v0.3.0** — Live SOC dashboard at http://13.50.16.19
