@@ -25,6 +25,8 @@ from collections import defaultdict
 from typing import List, Optional
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -42,6 +44,10 @@ app = FastAPI(
     description="Evasion Interception Platform — REST API for fade detection",
     version=CONFIG["branding"]["version"],
 )
+
+@app.get("/")
+def dashboard():
+    return FileResponse("dashboard/index.html")
 
 app.add_middleware(
     CORSMiddleware,
