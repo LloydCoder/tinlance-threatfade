@@ -24,6 +24,8 @@ parser = argparse.ArgumentParser(description="ThreatFade™ MVP – Tinlance Lim
 parser.add_argument("--scenario", choices=["c2_quieting", "lotl_gradual", "gnss_jam", "normal_with_fade", "mixed"], default="mixed")
 parser.add_argument("--data", help="Path to signal JSON file")
 parser.add_argument("--export", choices=["none", "json", "cef", "syslog"], default="none")
+parser.add_argument("--live", help="Network interface for live capture (e.g. eth0)")
+parser.add_argument("--duration", type=int, default=60, help="Live capture duration in seconds (default: 60)")
 parser.add_argument("--use-ml", action="store_true", help="Enable ML anomaly detection layer (Isolation Forest)")
 args = parser.parse_args()
 
@@ -38,6 +40,25 @@ if args.data:
     values = data["values"]
 else:
     timestamps, values = generate_signals(args.scenario)
+
+if args.live:
+    from core.live_monitor import LiveMonitor, is_live_available
+    if not is_live_available():
+        print("scapy not installed. Run: pip install scapy")
+        exit(1)
+    monitor = LiveMonitor(args.live)
+    monitor.start_capture(args.duration)
+    timestamps, values = monitor.to_entropy_signals()
+    source_name = f"live_{args.live}"
+elif args.data:
+    import json as _json
+    with open(args.data, "r") as f:
+        _data = _json.load(f)
+    timestamps = list(range(len(_data["values"])))
+    values = _data["values"]
+    source_name = args.data
+else:
+    source_name = args.scenario
 
 if args.use_ml and is_ml_available():
     ml = MLDetector()
