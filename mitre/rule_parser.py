@@ -33,8 +33,8 @@ ATTACK_DB = {
     "T1573.002": {
         "name": "Encrypted Channel: Asymmetric Cryptography",
         "tactic": "Command and Control",
-        "description": "Asymmetric encryption used for C2 with very high statistical anomaly.",
-        "detection": "Monitor for asymmetrically encrypted beacon traffic with z-score outliers.",
+        "description": "Asymmetric encryption used for C2 with very high statistical anomaly. Modern frameworks like Cobalt Strike, IcedID, and Merlin use TLS/HTTPS with RSA key exchange.",
+        "detection": "Monitor for asymmetrically encrypted beacon traffic with z-score outliers and deep fade windows (>90% drop ratio).",
         "severity": "critical",
     },
     "T1571": {
@@ -118,24 +118,42 @@ def match_mitre_ttp(result: Dict[str, Any]) -> str:
     confidence = result.get("confidence", "info")
     rules_matched = result.get("rules_matched", 0)
 
-    if z_outlier >= 10:
+    # CRITICAL: Modern encrypted C2 (Cobalt Strike, IcedID, Merlin)
+    # Characteristics: deep fade window (>80% drop), z-outlier 4-10,
+    # encrypted TLS/HTTPS channel with asymmetric key exchange
+    if z_outlier >= 4 and drop_ratio >= 0.8:
         return "T1573.002 – Encrypted Channel: Asymmetric Cryptography"
-    if z_outlier >= 5 and drop_ratio >= 0.4:
+
+    # High-confidence encrypted web C2 (HTTPS beaconing with jitter)
+    if z_outlier >= 3 and drop_ratio >= 0.4 and confidence in ("high", "critical"):
         return "T1071.001 – Application Layer Protocol: Web Protocols"
+
+    # Fallback encrypted channel (symmetric)
     if z_outlier >= 3 and confidence in ("high", "critical"):
-        return "T1571 – Non-Standard Port"
-    if drop_ratio >= 0.6 and rules_matched >= 2:
-        return "T1205.001 – Traffic Signaling: Port Knocking"
+        return "T1573.001 – Encrypted Channel: Symmetric Cryptography"
+
+    # DNS-based C2 with fade patterns
     if drop_ratio >= 0.6 and rules_matched >= 1:
         return "T1071.004 – Application Layer Protocol: DNS"
+
+    # Port knocking / traffic signaling
+    if drop_ratio >= 0.6 and rules_matched >= 2:
+        return "T1205.001 – Traffic Signaling: Port Knocking"
+
+    # High payload entropy (symmetric encryption)
     if entropy >= 6.5:
         return "T1573.001 – Encrypted Channel: Symmetric Cryptography"
+
+    # Steganography / obfuscation patterns
     if drop_ratio >= 0.5:
         return "T1027.003 – Obfuscated Files: Steganography"
+
+    # Lower confidence fallbacks
     if score >= 0.3 and rules_matched >= 1:
         return "T1202 – Indirect Command Execution"
     if score >= 0.2:
         return "T1027 – Obfuscated Files or Information"
+
     return "T1027 – Obfuscated Files or Information"
 
 
@@ -152,20 +170,34 @@ def match_all_ttps(result: Dict[str, Any]) -> List[Dict[str, str]]:
 
     matches = []
 
-    if z_outlier >= 10:
+    # Encrypted C2 (asymmetric) — Cobalt Strike, IcedID, Merlin
+    if z_outlier >= 4 and drop_ratio >= 0.8:
         matches.append(("T1573.002", 1.0))
-    if z_outlier >= 5:
-        matches.append(("T1573.001", 0.8))
-    if z_outlier >= 3:
-        matches.append(("T1571", 0.7))
+
+    # Web protocol C2
+    if z_outlier >= 3 and drop_ratio >= 0.4 and confidence in ("high", "critical"):
+        matches.append(("T1071.001", 0.85))
+
+    # Encrypted C2 (symmetric fallback)
+    if z_outlier >= 3 and confidence in ("high", "critical"):
+        matches.append(("T1573.001", 0.75))
+
+    # DNS C2
     if drop_ratio >= 0.6:
-        matches.append(("T1071.004", 0.75))
+        matches.append(("T1071.004", 0.7))
+
+    # Port knocking
+    if drop_ratio >= 0.6 and rules_matched >= 2:
         matches.append(("T1205.001", 0.65))
-    if drop_ratio >= 0.4:
-        matches.append(("T1071.001", 0.6))
+
+    # Non-standard port
+    if z_outlier >= 3:
+        matches.append(("T1571", 0.5))
+
+    # Obfuscation
     if score >= 0.3:
-        matches.append(("T1027", 0.5))
-        matches.append(("T1202", 0.45))
+        matches.append(("T1027", 0.45))
+        matches.append(("T1202", 0.4))
 
     results = []
     seen = set()

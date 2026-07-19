@@ -1,20 +1,8 @@
 #!/usr/bin/env python3
 """
-ThreatFade REST API
+ThreatFade REST API v0.3.0
 FastAPI wrapper around the fade detection engine.
 Runs locally or on any server. Completely offline.
-
-Usage:
-    python api.py
-    # or
-    uvicorn api:app --host 0.0.0.0 --port 8080
-
-Endpoints:
-    GET  /health
-    GET  /version
-    POST /detect
-    POST /detect/pcap
-    POST /detect/scenario
 """
 
 import os
@@ -133,7 +121,20 @@ def _byte_entropy(data: bytes) -> float:
     return ent
 
 
-def _pcap_to_signals(pcap_path: str, interval_sec: int = 60):
+
+def _pcap_to_signals(pcap_path: str, interval_sec: int = 5):
+    """
+    Hybrid signal extraction from PCAP for fade detection.
+    
+    Uses BOTH:
+    1. Raw payload entropy (when available — unencrypted traffic)
+    2. Packet metadata (timing, count, size) — always available, critical for encrypted TLS/HTTPS/QUIC
+    
+    This hybrid approach maximizes detection accuracy:
+    - Unencrypted C2: High entropy signal from Raw payloads
+    - Encrypted C2 (TLS/HTTPS/QUIC): Metadata signal from packet timing/count/size
+    - Mixed traffic: Combined signal captures both patterns
+    """
     try:
         from scapy.all import rdpcap, IP, TCP, UDP, Raw
     except ImportError:
@@ -141,32 +142,117 @@ def _pcap_to_signals(pcap_path: str, interval_sec: int = 60):
             status_code=500,
             detail="scapy not installed. Run: pip install scapy"
         )
+    
     packets = rdpcap(pcap_path)
-    sessions = defaultdict(list)
+    
+    # Collect ALL packets with IP layer
+    packet_events = []
     for pkt in packets:
-        if IP in pkt and Raw in pkt and (TCP in pkt or UDP in pkt):
-            sessions[float(pkt.time)].append(pkt[Raw].load)
-    if not sessions:
+        if IP in pkt:
+            ts = float(pkt.time)
+            size = len(pkt)
+            
+            # Payload size if available
+            payload_size = 0
+            if TCP in pkt and hasattr(pkt[TCP], 'payload'):
+                payload_size = len(bytes(pkt[TCP].payload))
+            elif UDP in pkt and hasattr(pkt[UDP], 'payload'):
+                payload_size = len(bytes(pkt[UDP].payload))
+            
+            # Raw payload entropy if available
+            raw_entropy = None
+            if Raw in pkt:
+                raw_data = bytes(pkt[Raw].load)
+                if len(raw_data) > 0:
+                    raw_entropy = _byte_entropy(raw_data)
+            
+            packet_events.append({
+                'time': ts,
+                'size': size,
+                'payload_size': payload_size,
+                'raw_entropy': raw_entropy,
+                'src': pkt[IP].src,
+                'dst': pkt[IP].dst,
+            })
+    
+    if not packet_events:
         return list(range(20)), [0.5] * 20
-    all_times = sorted(sessions.keys())
-    start_t = int(all_times[0])
-    end_t = int(all_times[-1])
-    timestamps, entropy_values = [], []
+    
+    # Sort by time
+    packet_events.sort(key=lambda x: x['time'])
+    
+    start_t = int(packet_events[0]['time'])
+    end_t = int(packet_events[-1]['time'])
+    duration = end_t - start_t
+    
+    # Adaptive interval
+    if duration < 30:
+        interval_sec = 1
+    elif duration > 600:
+        interval_sec = 10
+    else:
+        interval_sec = 5
+    
+    # Build time-series per bucket
+    timestamps = []
+    values = []
     current = start_t
-    while current < end_t:
-        payloads = []
-        for t in all_times:
-            if current <= t < current + interval_sec:
-                payloads.extend(sessions[t])
-        ent = _byte_entropy(b"".join(payloads)) if payloads else 0.0
+    
+    while current <= end_t:
+        bucket = [p for p in packet_events if current <= p['time'] < current + interval_sec]
+        
+        if bucket:
+            pkt_count = len(bucket)
+            total_bytes = sum(p['size'] for p in bucket)
+            total_payload = sum(p['payload_size'] for p in bucket)
+            
+            # Metadata signals
+            count_score = min(1.0, pkt_count / 100.0)
+            byte_score = min(1.0, total_bytes / 50000.0)
+            payload_ratio = total_payload / total_bytes if total_bytes > 0 else 0
+            
+            # Entropy signal (only from packets with Raw payload)
+            entropy_values = [p['raw_entropy'] for p in bucket if p['raw_entropy'] is not None]
+            if entropy_values:
+                mean_entropy = sum(entropy_values) / len(entropy_values)
+                # Shannon entropy max is 8.0 for random bytes, normalize to 0-1
+                entropy_score = min(1.0, mean_entropy / 8.0)
+                
+                # HYBRID: When entropy is available, weight it heavily
+                packets_with_raw = len(entropy_values)
+                raw_ratio = packets_with_raw / pkt_count
+                
+                if raw_ratio >= 0.5:
+                    # Mostly unencrypted — entropy is reliable
+                    signal = (0.5 * entropy_score) + (0.2 * count_score) + (0.2 * byte_score) + (0.1 * payload_ratio)
+                else:
+                    # Mostly encrypted — metadata is primary
+                    signal = (0.1 * entropy_score) + (0.4 * count_score) + (0.3 * byte_score) + (0.2 * payload_ratio)
+            else:
+                # No Raw payloads at all (fully encrypted like TLS/HTTPS/QUIC)
+                signal = (0.5 * count_score) + (0.3 * byte_score) + (0.2 * payload_ratio)
+        else:
+            signal = 0.0  # Silence = fade window
+        
         timestamps.append(current - start_t)
-        entropy_values.append(ent)
+        values.append(signal)
         current += interval_sec
-    return timestamps, entropy_values
+    
+    # Ensure minimum data points
+    if len(values) < 12:
+        while len(values) < 12:
+            values.append(0.0)
+            timestamps.append(timestamps[-1] + interval_sec if timestamps else len(timestamps))
+    
+    # Normalize to 0-1 using min-max (preserves relative drops)
+    max_val = max(values) if max(values) > 0 else 1.0
+    min_val = min(values)
+    if max_val > min_val:
+        values = [(v - min_val) / (max_val - min_val) for v in values]
+    
+    return timestamps, values
 
-
-# ── Endpoints ─────────────────────────────────────────────────
-
+@app.get("/health")
 @app.get("/health")
 def health():
     return {
@@ -193,7 +279,7 @@ def detect(req: DetectRequest):
     if not req.values or len(req.values) < 12:
         raise HTTPException(
             status_code=400,
-            detail=f"Need at least 12 signal values, got {len(req.values)}"
+            detail=f"Need at least 12 signal values, got {len(req.values) if req.values else 0}"
         )
     timestamps = req.timestamps or list(range(len(req.values)))
 
