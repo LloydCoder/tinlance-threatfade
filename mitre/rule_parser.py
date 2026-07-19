@@ -7,7 +7,6 @@ Based on real ATT&CK v14 taxonomy.
 from typing import Dict, Any, List, Tuple
 
 
-# Full ATT&CK sub-technique database relevant to fade/evasion detection
 ATTACK_DB = {
     "T1071.001": {
         "name": "Application Layer Protocol: Web Protocols",
@@ -34,7 +33,7 @@ ATTACK_DB = {
         "name": "Encrypted Channel: Asymmetric Cryptography",
         "tactic": "Command and Control",
         "description": "Asymmetric encryption used for C2 with very high statistical anomaly. Modern frameworks like Cobalt Strike, IcedID, and Merlin use TLS/HTTPS with RSA key exchange.",
-        "detection": "Monitor for asymmetrically encrypted beacon traffic with z-score outliers and deep fade windows (>90% drop ratio).",
+        "detection": "Monitor for asymmetrically encrypted beacon traffic with deep fade windows (>80% drop ratio) and elevated z-score outliers.",
         "severity": "critical",
     },
     "T1571": {
@@ -119,9 +118,10 @@ def match_mitre_ttp(result: Dict[str, Any]) -> str:
     rules_matched = result.get("rules_matched", 0)
 
     # CRITICAL: Modern encrypted C2 (Cobalt Strike, IcedID, Merlin)
-    # Characteristics: deep fade window (>80% drop), z-outlier 4-10,
-    # encrypted TLS/HTTPS channel with asymmetric key exchange
-    if z_outlier >= 4 and drop_ratio >= 0.8:
+    # Deep fade window (>80% drop) is the PRIMARY indicator of encrypted C2 quieting.
+    # z-score threshold relaxed to >= 2.5 because hybrid normalization compresses
+    # the z-score range while preserving the fade pattern.
+    if drop_ratio >= 0.8 and z_outlier >= 2.5:
         return "T1573.002 – Encrypted Channel: Asymmetric Cryptography"
 
     # High-confidence encrypted web C2 (HTTPS beaconing with jitter)
@@ -171,7 +171,7 @@ def match_all_ttps(result: Dict[str, Any]) -> List[Dict[str, str]]:
     matches = []
 
     # Encrypted C2 (asymmetric) — Cobalt Strike, IcedID, Merlin
-    if z_outlier >= 4 and drop_ratio >= 0.8:
+    if drop_ratio >= 0.8 and z_outlier >= 2.5:
         matches.append(("T1573.002", 1.0))
 
     # Web protocol C2
