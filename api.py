@@ -102,18 +102,18 @@ def _build_response(result, mitre_ttp, source_name, export_format):
 
     return DetectionResponse(
         timestamp=datetime.now().isoformat(),
-        detected=result["detected"],
-        confidence=result["confidence"],
-        score=round(result["score"], 4),
-        entropy=round(result["entropy"], 4),
-        drop_ratio=round(result["drop_ratio"], 4),
-        z_outlier=round(result["z_outlier"], 2),
-        fade_start=result["fade_start"],
-        rules_matched=result["rules_matched"],
+        detected=result.get("detected", False),
+        confidence=result.get("confidence", "info"),
+        score=round(result.get("score", 0.0), 4),
+        entropy=round(result.get("entropy", 0.0), 4),
+        drop_ratio=round(result.get("drop_ratio", 0.0), 4),
+        z_outlier=round(result.get("z_outlier", 0.0), 2),
+        fade_start=result.get("fade_start", -1),
+        rules_matched=result.get("rules_matched", 0),
         mitre_ttp=mitre_ttp,
         ml_score=round(result.get("ml_score", 0.0), 4),
         ml_anomaly=result.get("ml_anomaly", False),
-        combined_confidence=result.get("combined_confidence"),
+        combined_confidence=result.get("combined_confidence") or result.get("confidence", "info"),
         export_path=export_path,
     )
 
@@ -190,7 +190,7 @@ def version():
 
 @app.post("/detect", response_model=DetectionResponse)
 def detect(req: DetectRequest):
-    if len(req.values) < 12:
+    if not req.values or len(req.values) < 12:
         raise HTTPException(
             status_code=400,
             detail=f"Need at least 12 signal values, got {len(req.values)}"

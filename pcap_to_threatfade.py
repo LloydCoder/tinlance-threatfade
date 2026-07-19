@@ -87,7 +87,8 @@ def parse_pcap(pcap_path: str):
     return timestamps, values
 
 if __name__ == "__main__":
-    pcap_file = "data/pcaps/merlin_quic.pcapng"
+    import sys
+    pcap_file = sys.argv[1] if len(sys.argv) > 1 else "data/pcaps/merlin_quic.pcapng"
     print(f"\n[*] Converting {pcap_file} to ThreatFade signals...\n")
     ts, vals = pcap_to_signals(pcap_file)
     # Save as JSON for ThreatFade

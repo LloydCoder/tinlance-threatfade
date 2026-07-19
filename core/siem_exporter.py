@@ -44,7 +44,7 @@ class SIEMExporter:
     def _export_json(self, events: List[Dict], filename: str) -> str:
         payload = {
             "tool": "ThreatFade",
-            "version": "0.2.0-beta",
+            "version": "0.3.0-beta",
             "exported_at": datetime.datetime.now().isoformat(),
             "total_events": len(events),
             "events": events

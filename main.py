@@ -15,7 +15,10 @@ from core.ml_stub import MLDetector, is_ml_available
 from viz.timeline_plot import save_plot
 from mitre.rule_parser import match_mitre_ttp, get_mitre_description
 from volatility.memory_sim import simulate_volatility_dump
-from alerts.telegram_alert import send_telegram_alert
+try:
+    from alerts.telegram_alert import send_telegram_alert
+except ImportError:
+    send_telegram_alert = None
 
 with open("config.yaml", "r") as f:
     CONFIG = yaml.safe_load(f)

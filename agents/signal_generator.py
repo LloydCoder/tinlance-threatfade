@@ -101,10 +101,9 @@ def generate_mixed_scenario(points: int = 100) -> Tuple[List[float], List[float]
     values = []
     
     scenarios = [
-        generate_c2_quieting(25),
-        generate_lotl_gradual(25),
-        generate_gnss_jamming(25),
-        generate_normal_with_fake_fade(25)
+        generate_c2_quieting(33),
+        generate_lotl_gradual(33),
+        generate_gnss_jamming(34)
     ]
     
     for scenario_idx, (_, scenario_values) in enumerate(scenarios):

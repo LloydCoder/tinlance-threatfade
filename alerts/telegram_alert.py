@@ -5,8 +5,20 @@ Sends real-time threat notifications via Telegram
 
 from typing import Dict, Any
 import asyncio
-from telegram import Bot
-from telegram.error import TelegramError
+try:
+    from telegram import Bot
+    TELEGRAM_AVAILABLE = True
+except ImportError:
+    TELEGRAM_AVAILABLE = False
+    Bot = None
+
+try:
+    try:
+    from telegram.error import TelegramError
+except ImportError:
+    TelegramError = Exception
+except ImportError:
+    TelegramError = Exception
 import logging
 
 # Setup logging

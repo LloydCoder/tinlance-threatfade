@@ -10,7 +10,7 @@ fade_detection:
 branding:
   name: ThreatFade
   company: Tinlance Limited
-  version: 0.2.0-beta
+  version: 0.3.0-beta
 
 telegram:
   bot_token: YOUR_BOT_TOKEN_HERE
