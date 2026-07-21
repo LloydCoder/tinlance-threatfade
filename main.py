@@ -26,7 +26,7 @@ with open("config.yaml", "r") as f:
 parser = argparse.ArgumentParser(description="ThreatFade™ MVP – Tinlance Limited")
 parser.add_argument("--scenario", choices=["c2_quieting", "lotl_gradual", "gnss_jam", "normal_with_fade", "mixed"], default="mixed")
 parser.add_argument("--data", help="Path to signal JSON file")
-parser.add_argument("--export", choices=["none", "json", "cef", "syslog"], default="none")
+parser.add_argument("--export", choices=["none", "json", "splunk", "cef", "csv", "syslog"], default="none")
 parser.add_argument("--live", help="Network interface for live capture (e.g. eth0)")
 parser.add_argument("--duration", type=int, default=60, help="Live capture duration in seconds (default: 60)")
 parser.add_argument("--use-ml", action="store_true", help="Enable ML anomaly detection layer (Isolation Forest)")

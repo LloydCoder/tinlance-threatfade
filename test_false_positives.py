@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""False-Positive Baseline Test for ThreatFade."""
+"""False-Positive Baseline Test for ThreatFade — pytest format."""
 import json
 import random
 import os
+import pytest
 from datetime import datetime
 from core.fade_engine import detect_fade
 
@@ -44,41 +45,30 @@ PATTERNS = [
     ("API polling", gen_api_polling),
 ]
 
-def main():
-    print("=" * 60)
-    print("  ThreatFade False-Positive Baseline Test")
-    print("=" * 60)
-    results = []
+@pytest.mark.parametrize("name,fn", PATTERNS)
+def test_false_positive_baseline(name, fn):
+    """Test that normal traffic patterns produce < 15% false positives."""
+    fp = 0
+    runs = TOTAL_RUNS // len(PATTERNS)
+    for _ in range(runs):
+        vals = fn(SIGNAL_LENGTH)
+        r = detect_fade(list(range(len(vals))), vals)
+        if r["detected"]:
+            fp += 1
+    rate = (fp / runs) * 100
+    assert rate < 15, f"{name}: FP rate {rate:.1f}% >= 15%"
+
+def test_overall_false_positive_rate():
+    """Overall FP rate across all patterns must be < 10%."""
     false_positives = 0
     total = 0
     runs_per = TOTAL_RUNS // len(PATTERNS)
     for name, fn in PATTERNS:
-        fp = 0
         for _ in range(runs_per):
             vals = fn(SIGNAL_LENGTH)
             r = detect_fade(list(range(len(vals))), vals)
             total += 1
             if r["detected"]:
                 false_positives += 1
-                fp += 1
-        rate = (fp / runs_per) * 100
-        results.append({"pattern": name, "runs": runs_per, "false_positives": fp, "fp_rate_pct": round(rate, 1)})
-        tag = "PASS" if rate < 15 else "WARN"
-        print(f"  [{tag}] {name:20s}  FP: {fp}/{runs_per}  ({rate:.1f}%)")
     overall = (false_positives / total) * 100
-    print(f"\n{'_' * 60}")
-    print(f"  Overall false-positive rate: {false_positives}/{total} ({overall:.1f}%)")
-    if overall < 10:
-        print(f"  Verdict: GOOD (< 10%)")
-    elif overall < 20:
-        print(f"  Verdict: ACCEPTABLE (< 20%)")
-    else:
-        print(f"  Verdict: NEEDS WORK (>= 20%)")
-    os.makedirs("reports", exist_ok=True)
-    report = {"timestamp": datetime.now().isoformat(), "total_runs": total, "total_false_positives": false_positives, "overall_fp_rate_pct": round(overall, 1), "patterns": results}
-    with open("reports/fp_baseline_report.json", "w") as f:
-        json.dump(report, f, indent=2)
-    print(f"  Report saved: reports/fp_baseline_report.json")
-
-if __name__ == "__main__":
-    main()
+    assert overall < 10, f"Overall FP rate {overall:.1f}% >= 10%"
