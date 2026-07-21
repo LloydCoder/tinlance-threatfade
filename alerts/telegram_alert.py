@@ -5,6 +5,8 @@ Sends real-time threat notifications via Telegram
 
 from typing import Dict, Any
 import asyncio
+import logging
+
 try:
     from telegram import Bot
     TELEGRAM_AVAILABLE = True
@@ -13,153 +15,88 @@ except ImportError:
     Bot = None
 
 try:
-    try:
     from telegram.error import TelegramError
 except ImportError:
     TelegramError = Exception
-except ImportError:
-    TelegramError = Exception
-import logging
 
-# Setup logging
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def send_telegram_alert(
-    result: Dict[str, Any],
-    mitre_ttp: str,
-    vol_artifacts: str,
-    plot_path: str,
+
+async def send_telegram_alert(
+    detection_result: Dict[str, Any],
     bot_token: str,
-    chat_id: str
+    chat_id: str,
+    image_path: str = None
 ) -> bool:
     """
-    Send Telegram alert with detection results and visualization
+    Send a detection alert via Telegram.
     
     Args:
-        result: Detection result dictionary
-        mitre_ttp: MITRE TTP string
-        vol_artifacts: Volatility artifacts string
-        plot_path: Path to PNG visualization
-        bot_token: Telegram bot token
-        chat_id: Telegram chat ID
-    
+        detection_result: The fade detection result dictionary
+        bot_token: Telegram bot API token
+        chat_id: Target chat ID
+        image_path: Optional path to visualization image
+        
     Returns:
-        True if sent successfully, False otherwise
+        bool: True if message sent successfully
     """
-    try:
-        # Build message
-        message = format_alert_message(result, mitre_ttp, vol_artifacts)
-        
-        # Run async sending
-        success = asyncio.run(_send_async(bot_token, chat_id, message, plot_path))
-        
-        if success:
-            logger.info("Telegram alert sent successfully")
-            return True
-        else:
-            logger.warning("Telegram alert failed to send")
-            return False
-            
-    except Exception as e:
-        logger.error(f"Error sending Telegram alert: {e}")
+    if not TELEGRAM_AVAILABLE:
+        logger.info("Telegram alerts skipped — python-telegram-bot not installed")
         return False
-
-async def _send_async(bot_token: str, chat_id: str, message: str, plot_path: str) -> bool:
-    """
-    Async function to send message and photo to Telegram
     
-    Args:
-        bot_token: Bot token
-        chat_id: Chat ID
-        message: Message text
-        plot_path: Path to image file
-    
-    Returns:
-        True if successful
-    """
     try:
         bot = Bot(token=bot_token)
         
-        # Send text message
-        await bot.send_message(chat_id=chat_id, text=message, parse_mode='HTML')
+        message = (
+            f"🚨 *ThreatFade Alert* 🚨\n\n"
+            f"• Detected: {'YES' if detection_result.get('detected') else 'NO'}\n"
+            f"• Confidence: {detection_result.get('confidence', 'N/A')}\n"
+            f"• Score: {detection_result.get('score', 0):.4f}\n"
+            f"• MITRE TTP: {detection_result.get('mitre_ttp', 'N/A')}\n"
+            f"• Z-Outlier: {detection_result.get('z_outlier', 0):.2f}\n"
+            f"• Drop Ratio: {detection_result.get('drop_ratio', 0):.2f}\n\n"
+            f"_ThreatFade v0.3.0-beta — Tinlance Limited_"
+        )
         
-        # Send visualization
-        with open(plot_path, 'rb') as photo:
-            await bot.send_photo(
+        if image_path:
+            with open(image_path, 'rb') as img:
+                await bot.send_photo(
+                    chat_id=chat_id,
+                    photo=img,
+                    caption=message,
+                    parse_mode='Markdown'
+                )
+        else:
+            await bot.send_message(
                 chat_id=chat_id,
-                photo=photo,
-                caption="ThreatFade Detection Visualization"
+                text=message,
+                parse_mode='Markdown'
             )
         
+        logger.info("Telegram alert sent successfully")
         return True
         
     except TelegramError as e:
         logger.error(f"Telegram API error: {e}")
         return False
     except Exception as e:
-        logger.error(f"Error in async send: {e}")
+        logger.error(f"Failed to send Telegram alert: {e}")
         return False
 
-def format_alert_message(result: Dict[str, Any], mitre_ttp: str, vol_artifacts: str) -> str:
-    """
-    Format alert message for Telegram
-    
-    Args:
-        result: Detection result
-        mitre_ttp: MITRE TTP
-        vol_artifacts: Volatility artifacts
-    
-    Returns:
-        Formatted message string
-    """
-    message = "<b>🚨 ThreatFade Alert 🚨</b>\n\n"
-    
-    message += f"<b>Status:</b> {'THREAT DETECTED' if result['detected'] else 'NORMAL'}\n"
-    message += f"<b>Detection Score:</b> {result['score']:.2f}/1.0\n\n"
-    
-    message += "<b>Metrics:</b>\n"
-    message += f"  • Entropy: {result['entropy']:.4f}\n"
-    message += f"  • Drop Ratio: {result['drop_ratio']:.4f}\n"
-    message += f"  • Z-Score: {result['z_outlier']:.2f}\n\n"
-    
-    message += "<b>MITRE ATT&CK:</b>\n"
-    message += f"  {mitre_ttp}\n\n"
-    
-    message += "<b>Memory Artifacts:</b>\n"
-    message += f"  {vol_artifacts}\n\n"
-    
-    message += "<i>ThreatFade MVP – Tinlance Limited</i>"
-    
-    return message
 
-def send_simple_alert(bot_token: str, chat_id: str, alert_text: str) -> bool:
-    """
-    Send simple text alert (without image)
-    
-    Args:
-        bot_token: Telegram bot token
-        chat_id: Telegram chat ID
-        alert_text: Alert message
-    
-    Returns:
-        True if successful
-    """
+def send_alert_sync(
+    detection_result: Dict[str, Any],
+    bot_token: str,
+    chat_id: str,
+    image_path: str = None
+) -> bool:
+    """Synchronous wrapper for send_telegram_alert."""
     try:
-        asyncio.run(_send_simple_async(bot_token, chat_id, alert_text))
-        return True
+        return asyncio.run(send_telegram_alert(
+            detection_result, bot_token, chat_id, image_path
+        ))
     except Exception as e:
-        logger.error(f"Error sending simple alert: {e}")
-        return False
-
-async def _send_simple_async(bot_token: str, chat_id: str, alert_text: str) -> bool:
-    """
-    Async function to send simple text message
-    """
-    try:
-        bot = Bot(token=bot_token)
-        await bot.send_message(chat_id=chat_id, text=alert_text, parse_mode='HTML')
-        return True
-    except Exception as e:
-        logger.error(f"Error sending message: {e}")
+        logger.error(f"Failed to send alert: {e}")
         return False
