@@ -11,17 +11,29 @@ from typing import Dict, List, Tuple, Any
 
 
 def calculate_entropy(values: List[float], window: int = 8) -> np.ndarray:
-    entropy_vals = []
-    for i in range(len(values) - window + 1):
-        window_vals = values[i : i + window]
-        total = np.sum(np.abs(window_vals))
-        if total == 0:
-            entropy_vals.append(0.0)
-            continue
-        normalized = np.array(window_vals) / total
-        ent = -np.sum(normalized * np.log2(np.abs(normalized) + 1e-10))
-        entropy_vals.append(ent)
-    return np.array(entropy_vals)
+    """Vectorized Shannon entropy over sliding windows."""
+    if len(values) < window:
+        return np.array([0.0])
+    
+    values = np.asarray(values, dtype=np.float64)
+    n = len(values) - window + 1
+    
+    # Sliding window using stride tricks — O(1) memory overhead
+    shape = (n, window)
+    strides = (values.strides[0], values.strides[0])
+    windows = np.lib.stride_tricks.as_strided(values, shape=shape, strides=strides)
+    
+    # Vectorized entropy calculation
+    abs_vals = np.abs(windows)
+    totals = abs_vals.sum(axis=1)
+    totals = np.where(totals == 0, 1, totals)
+    normalized = abs_vals / totals[:, np.newaxis]
+    
+    # Shannon entropy
+    log_p = np.log2(normalized + 1e-10)
+    entropies = -np.sum(normalized * log_p, axis=1)
+    
+    return entropies
 
 
 def calculate_drop_ratio(values: List[float], threshold: float = 0.5) -> float:
