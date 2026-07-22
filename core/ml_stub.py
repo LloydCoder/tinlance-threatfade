@@ -78,9 +78,13 @@ class MLDetector:
             return
         if MODEL_PATH.exists() and SCALER_PATH.exists():
             try:
-                self.model = joblib.load(MODEL_PATH)
-                self.scaler = joblib.load(SCALER_PATH)
-                self.trained = True
+                import warnings
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", category=UserWarning)
+                    warnings.simplefilter("ignore", category=DeprecationWarning)
+                    self.model = joblib.load(MODEL_PATH)
+                    self.scaler = joblib.load(SCALER_PATH)
+                    self.trained = True
             except Exception:
                 self.trained = False
 
