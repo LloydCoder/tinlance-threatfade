@@ -24,23 +24,13 @@ from mitre.rule_parser import match_mitre_ttp
 with open("config.yaml", "r", encoding="utf-8") as f:
     CONFIG = yaml.safe_load(f)
 
-app = FastAPI(
-    title="ThreatFade API",
-    description="Evasion Interception Platform — REST API for fade detection",
-    version=CONFIG["branding"]["version"],
-)
-
+app = FastAPI(title="ThreatFade API", description="Evasion Interception Platform — REST API for fade detection", version=CONFIG["branding"]["version"])
 allowed_origins = [x.strip() for x in os.getenv("THREATFADE_ALLOWED_ORIGINS", "*").split(",") if x.strip()]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "X-API-Key"],
-)
+app.add_middleware(CORSMiddleware, allow_origins=allowed_origins, allow_methods=["GET", "POST"], allow_headers=["Content-Type", "X-API-Key"])
 
 
 class DetectRequest(BaseModel):
-    values: List[float] = Field(..., min_length=12, max_length=100000)
+    values: List[float] = Field(..., max_length=100000)
     timestamps: Optional[List[float]] = None
     use_ml: bool = False
     export_format: Optional[str] = None
@@ -96,7 +86,7 @@ def _build_response(result, mitre_ttp, source_name, export_format):
     if export_format and export_format.lower() not in {"none", ""}:
         fmt = export_format.lower()
         if fmt in {"sigma", "stix", "stix2.1"}:
-            payload = to_sigma(result) if fmt == "sigma" else to_stix_bundle(result, source_name)
+            payload = to_sigma(result, title=f"ThreatFade: {source_name}") if fmt == "sigma" else to_stix_bundle(result, source_name)
             output = os.path.join("reports", "interoperability")
             os.makedirs(output, exist_ok=True)
             ext = "yml" if fmt == "sigma" else "json"
@@ -106,24 +96,14 @@ def _build_response(result, mitre_ttp, source_name, export_format):
                 json.dump(payload, f, indent=2)
             export_path = path
         else:
-            exporter = SIEMExporter()
-            export_path = exporter.export(result, source_name=source_name, format_type=fmt)
+            export_path = SIEMExporter().export(result, source_name=source_name, format_type=fmt)
     return DetectionResponse(
-        timestamp=datetime.now().isoformat(),
-        detected=bool(result.get("detected", False)),
-        confidence=result.get("confidence", "info"),
-        score=round(float(result.get("score", 0.0)), 4),
-        entropy=round(float(result.get("entropy", 0.0)), 4),
-        drop_ratio=round(float(result.get("drop_ratio", 0.0)), 4),
-        z_outlier=round(float(result.get("z_outlier", 0.0)), 2),
-        fade_start=int(result.get("fade_start", -1)),
-        rules_matched=int(result.get("rules_matched", 0)),
-        mitre_ttp=mitre_ttp,
-        evidence=result["evidence"],
-        ml_score=round(float(result.get("ml_score", 0.0)), 4),
-        ml_anomaly=bool(result.get("ml_anomaly", False)),
-        combined_confidence=result.get("combined_confidence") or result.get("confidence", "info"),
-        export_path=export_path,
+        timestamp=datetime.now().isoformat(), detected=bool(result.get("detected", False)), confidence=result.get("confidence", "info"),
+        score=round(float(result.get("score", 0.0)), 4), entropy=round(float(result.get("entropy", 0.0)), 4),
+        drop_ratio=round(float(result.get("drop_ratio", 0.0)), 4), z_outlier=round(float(result.get("z_outlier", 0.0)), 2),
+        fade_start=int(result.get("fade_start", -1)), rules_matched=int(result.get("rules_matched", 0)), mitre_ttp=mitre_ttp,
+        evidence=result["evidence"], ml_score=round(float(result.get("ml_score", 0.0)), 4), ml_anomaly=bool(result.get("ml_anomaly", False)),
+        combined_confidence=result.get("combined_confidence") or result.get("confidence", "info"), export_path=export_path,
     )
 
 
@@ -146,37 +126,24 @@ def _pcap_to_signals(pcap_path: str, interval_sec: int = 5):
         from scapy.all import IP, Raw, TCP, UDP, rdpcap
     except ImportError as exc:
         raise HTTPException(status_code=500, detail="scapy is required for PCAP ingestion") from exc
-
     try:
         packets = rdpcap(pcap_path)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Invalid or unreadable PCAP: {exc}") from exc
-
     events = []
     for pkt in packets:
         if IP not in pkt:
             continue
-        payload_size = 0
-        if TCP in pkt:
-            payload_size = len(bytes(pkt[TCP].payload))
-        elif UDP in pkt:
-            payload_size = len(bytes(pkt[UDP].payload))
-        raw_entropy = None
-        if Raw in pkt and bytes(pkt[Raw].load):
-            raw_entropy = _byte_entropy(bytes(pkt[Raw].load))
+        payload_size = len(bytes(pkt[TCP].payload)) if TCP in pkt else len(bytes(pkt[UDP].payload)) if UDP in pkt else 0
+        raw_entropy = _byte_entropy(bytes(pkt[Raw].load)) if Raw in pkt and bytes(pkt[Raw].load) else None
         events.append({"time": float(pkt.time), "size": len(pkt), "payload_size": payload_size, "raw_entropy": raw_entropy})
-
     if not events:
         return list(range(20)), [0.5] * 20
-
     events.sort(key=lambda item: item["time"])
-    start = int(events[0]["time"])
-    end = int(events[-1]["time"])
+    start, end = int(events[0]["time"]), int(events[-1]["time"])
     duration = end - start
     interval_sec = 1 if duration < 30 else 10 if duration > 600 else interval_sec
-
-    timestamps, values = [], []
-    current = start
+    timestamps, values, current = [], [], start
     while current <= end:
         bucket = [p for p in events if current <= p["time"] < current + interval_sec]
         if not bucket:
@@ -189,17 +156,10 @@ def _pcap_to_signals(pcap_path: str, interval_sec: int = 5):
             entropies = [p["raw_entropy"] for p in bucket if p["raw_entropy"] is not None]
             entropy_score = (sum(entropies) / len(entropies)) / 8.0 if entropies else 0.0
             raw_ratio = len(entropies) / len(bucket)
-            if raw_ratio >= 0.5:
-                signal = 0.5 * entropy_score + 0.2 * count_score + 0.2 * byte_score + 0.1 * payload_ratio
-            else:
-                signal = 0.1 * entropy_score + 0.4 * count_score + 0.3 * byte_score + 0.2 * payload_ratio
-        timestamps.append(current - start)
-        values.append(float(signal))
-        current += interval_sec
-
+            signal = (0.5 * entropy_score + 0.2 * count_score + 0.2 * byte_score + 0.1 * payload_ratio) if raw_ratio >= 0.5 else (0.1 * entropy_score + 0.4 * count_score + 0.3 * byte_score + 0.2 * payload_ratio)
+        timestamps.append(current - start); values.append(float(signal)); current += interval_sec
     while len(values) < 12:
-        values.append(0.0)
-        timestamps.append((timestamps[-1] + interval_sec) if timestamps else len(timestamps))
+        values.append(0.0); timestamps.append((timestamps[-1] + interval_sec) if timestamps else len(timestamps))
     lo, hi = min(values), max(values)
     if hi > lo:
         values = [(v - lo) / (hi - lo) for v in values]
@@ -224,32 +184,28 @@ def version():
 @app.post("/detect", response_model=DetectionResponse)
 def detect(req: DetectRequest, request: Request, x_api_key: Optional[str] = Header(default=None)):
     _guard(request, x_api_key)
+    if len(req.values) < 12:
+        raise HTTPException(status_code=400, detail=f"Need at least 12 signal values, got {len(req.values)}")
     if req.timestamps is not None and len(req.timestamps) != len(req.values):
         raise HTTPException(status_code=400, detail="timestamps length must match values length")
     timestamps = req.timestamps or list(range(len(req.values)))
     result = _run_detection(timestamps, req.values, req.use_ml)
-    mitre = match_mitre_ttp(result) if result["detected"] else "None"
-    return _build_response(result, mitre, "api_detect", req.export_format)
+    return _build_response(result, match_mitre_ttp(result) if result["detected"] else "None", "api_detect", req.export_format)
 
 
 @app.post("/detect/pcap", response_model=DetectionResponse)
-async def detect_pcap(file: UploadFile = File(...), use_ml: bool = False, export_format: Optional[str] = None, request: Request = None, x_api_key: Optional[str] = Header(default=None)):
+async def detect_pcap(request: Request, file: UploadFile = File(...), use_ml: bool = False, export_format: Optional[str] = None, x_api_key: Optional[str] = Header(default=None)):
     _guard(request, x_api_key)
     validate_pcap_upload(file)
     content = await read_limited_upload(file)
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pcap") as tmp:
-        tmp.write(content)
-        tmp_path = tmp.name
+        tmp.write(content); tmp_path = tmp.name
     try:
-        timestamps, values = _pcap_to_signals(tmp_path)
-        result = _run_detection(timestamps, values, use_ml)
+        timestamps, values = _pcap_to_signals(tmp_path); result = _run_detection(timestamps, values, use_ml)
     finally:
-        try:
-            os.unlink(tmp_path)
-        except FileNotFoundError:
-            pass
-    mitre = match_mitre_ttp(result) if result["detected"] else "None"
-    return _build_response(result, mitre, (file.filename or "upload").replace(" ", "_"), export_format)
+        try: os.unlink(tmp_path)
+        except FileNotFoundError: pass
+    return _build_response(result, match_mitre_ttp(result) if result["detected"] else "None", (file.filename or "upload").replace(" ", "_"), export_format)
 
 
 @app.post("/detect/scenario", response_model=DetectionResponse)
@@ -260,8 +216,7 @@ def detect_scenario(req: ScenarioRequest, request: Request, x_api_key: Optional[
         raise HTTPException(status_code=400, detail=f"Invalid scenario. Choose from: {valid}")
     timestamps, values = generate_signals(req.scenario)
     result = _run_detection(timestamps, values, req.use_ml)
-    mitre = match_mitre_ttp(result) if result["detected"] else "None"
-    return _build_response(result, mitre, req.scenario, req.export_format)
+    return _build_response(result, match_mitre_ttp(result) if result["detected"] else "None", req.scenario, req.export_format)
 
 
 if __name__ == "__main__":
