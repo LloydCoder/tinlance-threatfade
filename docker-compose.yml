@@ -1,0 +1,20 @@
+services:
+  threatfade:
+    build: .
+    restart: unless-stopped
+    environment:
+      THREATFADE_ENV: production
+      THREATFADE_API_KEY: ${THREATFADE_API_KEY:?set THREATFADE_API_KEY}
+      THREATFADE_ALLOWED_ORIGINS: ${THREATFADE_ALLOWED_ORIGINS:-http://localhost:8080}
+      THREATFADE_MAX_PCAP_BYTES: ${THREATFADE_MAX_PCAP_BYTES:-104857600}
+      THREATFADE_RATE_LIMIT: ${THREATFADE_RATE_LIMIT:-120}
+      THREATFADE_RATE_WINDOW_SECONDS: ${THREATFADE_RATE_WINDOW_SECONDS:-60}
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "8080:8080"
