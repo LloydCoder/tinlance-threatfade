@@ -1,20 +1,48 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-threatfade}
+      POSTGRES_USER: ${POSTGRES_USER:-threatfade}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   threatfade:
     build: .
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
       THREATFADE_ENV: production
-      THREATFADE_API_KEY: ${THREATFADE_API_KEY:?set THREATFADE_API_KEY}
-      THREATFADE_ALLOWED_ORIGINS: ${THREATFADE_ALLOWED_ORIGINS:-http://localhost:8080}
+      THREATFADE_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-threatfade}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-threatfade}
+      THREATFADE_OIDC_ISSUER: ${THREATFADE_OIDC_ISSUER:?set THREATFADE_OIDC_ISSUER}
+      THREATFADE_OIDC_AUDIENCE: ${THREATFADE_OIDC_AUDIENCE:?set THREATFADE_OIDC_AUDIENCE}
+      THREATFADE_OIDC_JWKS_URL: ${THREATFADE_OIDC_JWKS_URL:-}
+      THREATFADE_ALLOWED_ORIGINS: ${THREATFADE_ALLOWED_ORIGINS:?set THREATFADE_ALLOWED_ORIGINS}
       THREATFADE_MAX_PCAP_BYTES: ${THREATFADE_MAX_PCAP_BYTES:-104857600}
       THREATFADE_RATE_LIMIT: ${THREATFADE_RATE_LIMIT:-120}
       THREATFADE_RATE_WINDOW_SECONDS: ${THREATFADE_RATE_WINDOW_SECONDS:-60}
+      THREATFADE_AUDIT_PATH: /var/lib/threatfade/audit/audit.jsonl
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=256m
+    volumes:
+      - audit_data:/var/lib/threatfade/audit
     cap_drop:
       - ALL
     security_opt:
       - no-new-privileges:true
     ports:
       - "8080:8080"
+
+volumes:
+  postgres_data:
+  audit_data:
