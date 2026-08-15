@@ -1,10 +1,14 @@
 """Reproducible benchmark harness for ThreatFade's deterministic scenarios."""
 import json
+import sys
 import time
 from pathlib import Path
 from typing import Dict, List
 
 import numpy as np
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
 from agents.signal_generator import generate_signals
 from core.fade_engine import detect_fade
@@ -48,7 +52,7 @@ def run() -> Dict[str, object]:
 
 def main() -> None:
     report = run()
-    out = Path("reports/benchmarks")
+    out = ROOT / "reports" / "benchmarks"
     out.mkdir(parents=True, exist_ok=True)
     (out / "synthetic-scenario-v1.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2))
