@@ -2,9 +2,9 @@
 
 **Evasion Interception Platform** by Tinlance Limited.
 
-ThreatFade detects moments when adversaries intentionally reduce observable signals — for example C2 quieting, gradual LOTL activity reduction, and GNSS interference — and reconstructs the event using entropy analysis, z-score anomaly detection, heuristic rules, confidence scoring, optional ML anomaly detection, MITRE ATT&CK mapping, SIEM export, and operational integrations.
+ThreatFade detects moments when adversaries intentionally reduce observable signals — including C2 quieting, gradual LOTL activity reduction, and GNSS interference — using entropy analysis, statistical deviation, heuristic detection, confidence scoring, optional ML anomaly detection, ATT&CK mapping, SIEM interoperability, and operational integrations.
 
-**Status:** v0.4.0
+**Status:** v0.4.0 — enterprise engineering baseline  
 **License:** Apache 2.0 (open-core)
 
 ## Quick start
@@ -15,60 +15,50 @@ cd tinlance-threatfade
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python main.py
+python api.py
 ```
 
-Run the API:
+Check readiness:
 
 ```bash
-python api.py
 curl http://localhost:8080/health
+curl http://localhost:8080/ready
+```
+
+Production container reference:
+
+```bash
+export THREATFADE_API_KEY='use-a-secret-manager-in-real-deployments'
+docker compose up --build
 ```
 
 ## Detection pipeline
 
 ```text
 Signal / PCAP
-     ↓
-Signal extraction
-     ↓
-Rolling entropy + statistical deviation
-     ↓
-Heuristic detection rules
-     ↓
-Optional Isolation Forest anomaly layer
-     ↓
-Confidence + evidence
-     ↓
-MITRE ATT&CK mapping
-     ↓
-SIEM / Sigma / STIX 2.1 / FusionOps
+  -> signal extraction
+  -> rolling entropy + statistical deviation
+  -> detection rules
+  -> optional ML anomaly layer
+  -> confidence + structured evidence
+  -> ATT&CK mapping
+  -> JSON / SIEM / Sigma / STIX 2.1 / FusionOps
 ```
 
-## Current capabilities
+## Capabilities
 
-### Detection and analytics
+### Detection
 
-- Direct PCAP/PCAPNG ingestion
-- Hybrid encrypted/unencrypted PCAP signal extraction
-- Rolling Shannon entropy analysis
+- PCAP/PCAPNG ingestion
+- Hybrid encrypted/unencrypted signal extraction
+- Rolling Shannon entropy
 - Z-score anomaly detection
-- Rule-based fade detection
-- Confidence scoring: critical/high/medium/low/info
-- Optional Isolation Forest ML anomaly layer
-- Structured, analyst-readable detection evidence
+- C2, LOTL and GNSS fade scenarios
+- Optional Isolation Forest layer
+- Structured analyst evidence and confidence
 - Alert deduplication
-- Multi-agent coordination
 - Live network/process monitoring
-- Satellite signal fusion: AIS/ADS-B/GPS
-
-### Threat scenarios
-
-- C2 quieting
-- LOTL gradual reduction
-- GNSS jamming
-- Mixed threat activity
-- Normal traffic with temporary signal dips for false-positive testing
+- AIS/ADS-B/GPS signal-fusion components
 
 ### Interoperability
 
@@ -76,169 +66,143 @@ SIEM / Sigma / STIX 2.1 / FusionOps
 - Splunk HEC
 - CEF
 - CSV
-- Sigma-compatible detection output
+- Sigma-compatible output
 - STIX 2.1-compatible bundles
 - MITRE ATT&CK mapping
 - FusionOps integration
 
-### Operational API
+### API security
 
-FastAPI endpoints include:
+The API includes bounded input validation, PCAP size limits, rate limiting, request IDs, security headers, readiness checks, finite-number validation, safe upload handling, configurable CORS, and fail-closed production authentication.
 
-- `GET /health`
-- `GET /version`
-- `POST /detect`
-- `POST /detect/scenario`
-- `POST /detect/pcap`
-
-The API supports optional API-key authentication, request rate limiting, configurable PCAP upload limits, configurable CORS origins, input validation, temporary-file cleanup, and structured evidence responses.
-
-Configure production controls with `.env`:
+Production configuration:
 
 ```text
-THREATFADE_API_KEY=
+THREATFADE_ENV=production
+THREATFADE_API_KEY=<secret-manager-value>
 THREATFADE_MAX_PCAP_BYTES=104857600
+THREATFADE_MAX_BODY_BYTES=2097152
 THREATFADE_RATE_LIMIT=120
 THREATFADE_RATE_WINDOW_SECONDS=60
-THREATFADE_ALLOWED_ORIGINS=http://localhost:8080
+THREATFADE_ALLOWED_ORIGINS=https://your-console.example
 ```
 
-If `THREATFADE_API_KEY` is configured, protected detection endpoints require `X-API-Key`.
+For enterprise SSO, place the API behind an OIDC identity-aware gateway such as Entra ID, Okta, Auth0, Keycloak, or an equivalent provider. Do not implement tenant identity from an arbitrary client-supplied header.
+
+## Enterprise deployment
+
+Reference assets are provided for hardened deployment:
+
+- Non-root Docker image
+- Read-only filesystem / dropped Linux capabilities in the Compose profile
+- Kubernetes deployment with probes, resource limits, non-root execution and `seccomp` RuntimeDefault
+- Dependabot for Python and GitHub Actions dependencies
+- CodeQL analysis
+- Gitleaks secret scanning
+- Dependency auditing with `pip-audit`
+- CODEOWNERS
+- Threat model and enterprise control matrix
+- Architecture Decision Record process
+
+See [`docs/ENTERPRISE_READINESS.md`](docs/ENTERPRISE_READINESS.md), [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md), and [`docs/CONTROL_MATRIX.md`](docs/CONTROL_MATRIX.md).
+
+### Enterprise architecture boundary
+
+```text
+                    +----------------------+
+Users / SIEM -----> | Edge / OIDC / TLS    |
+                    +----------+-----------+
+                               |
+                         Control plane
+                     +---------+----------+
+                     | ThreatFade API      |
+                     | auth / policy       |
+                     | rules / exports     |
+                     +---------+----------+
+                               |
+                         Data plane
+              +----------------+----------------+
+              | detection workers / PCAP / live |
+              +----------------+----------------+
+                               |
+               +---------------+---------------+
+               | Postgres | Object Store | Bus |
+               +---------------+---------------+
+                               |
+                     SIEM / SOAR / FusionOps
+```
+
+The community repository provides the portable detector and reference deployment. Enterprise operators provide the identity provider, durable storage, queueing, HA, regional controls, backup/restore and customer-specific retention policy.
 
 ## Detection evidence
 
-Every API detection now exposes structured evidence rather than only a verdict:
-
-```json
-{
-  "summary": "sustained reduction in signal activity; statistically significant deviation from baseline",
-  "signals": [
-    "sustained reduction in signal activity",
-    "statistically significant deviation from baseline"
-  ],
-  "metrics": {
-    "score": 0.81,
-    "entropy": 1.12,
-    "drop_ratio": 0.67,
-    "z_outlier": 7.01,
-    "rules_matched": 2
-  },
-  "fade_start": 42
-}
-```
-
-This is designed for analysts and downstream automation: the system records **why** a detection fired, not merely that it fired.
+Every detection exposes structured evidence describing why the detector fired, including signal changes, statistical deviation, score and matched rules. This evidence is intended for analyst workflows and downstream automation.
 
 ## Detection packs
 
-ThreatFade includes versioned detection-pack metadata with stable rule IDs, semantic versions, descriptions, and ATT&CK mappings.
+Detection rules are versioned with stable IDs, semantic versions, descriptions and ATT&CK mappings. The intended lifecycle is:
 
-Current core rules include:
+**Research -> Backtest -> Canary -> Production -> Deprecated**
 
-- `TF-C2-001` — C2 signal fade
-- `TF-LOTL-001` — LOTL gradual fade
-- `TF-GNSS-001` — GNSS interference
+Current core rules include `TF-C2-001`, `TF-LOTL-001`, and `TF-GNSS-001`.
 
-## Benchmarking
+## Benchmarking and validation
 
-The repository contains a reproducible synthetic benchmark:
+Run the deterministic benchmark:
 
 ```bash
 python benchmarks/benchmark.py
 ```
 
-It evaluates expected detection/non-detection across the deterministic scenario suite and records accuracy, confidence, score, and detector latency in `reports/benchmarks/`.
+The benchmark is separate from real-PCAP validation. The repository records author-confirmed validation against Merlin QUIC C2, Cobalt Strike and IcedID and the documented 0% false-positive baseline across five normal traffic patterns and 100 test runs. These are project validation results, not universal accuracy guarantees.
 
-The benchmark is deliberately separate from the project's real-PCAP validation. Real-PCAP results remain documented as validation evidence rather than being mixed with synthetic test metrics.
+The engineering test suite also exercises robustness boundaries such as jitter/noise, sustained fades, constant signals, extreme values, minimum-length inputs and configuration limits.
 
-## Adversarial testing
+## Observability and operations
 
-The test suite covers robustness against:
+ThreatFade includes optional OpenTelemetry instrumentation, structured API request IDs, health/readiness endpoints, alert deduplication, streaming/parallel PCAP processors and operational export paths.
 
-- jitter/noisy signals
-- sustained fades
-- constant signals
-- extreme values
-- minimum-length inputs
-- configuration boundaries
-- false-positive scenarios
+Recommended production SLOs are documented in `docs/ENTERPRISE_READINESS.md`; they are targets to measure, not guarantees.
 
-The goal is to make evasion detection resilient without treating synthetic tests as proof of universal real-world accuracy.
+## Security and governance
 
-## Memory analysis
+ThreatFade follows a security baseline informed by OWASP ASVS 5.0 and NIST CSF 2.0. The repository includes a maintained threat model, security disclosure process, dependency automation, CodeQL, secret scanning, dependency auditing, secure deployment references and ownership controls.
 
-ThreatFade retains the existing simulated Volatility artifact layer and now includes an optional `core/volatility_adapter.py` integration boundary for Volatility 3. The adapter validates memory-image inputs and reports whether the Volatility 3 runtime is available, allowing memory analysis to be added without making the base detector depend on the optional engine.
-
-## Observability
-
-`core/observability.py` provides optional OpenTelemetry tracing around detector execution. When the OpenTelemetry API is installed, ThreatFade creates `threatfade` spans; otherwise it safely falls back to a no-op implementation.
-
-## Real-world validation
-
-The project has been validated by the author against real malware traffic and the existing repository validation corpus, including Merlin QUIC C2, Cobalt Strike, and IcedID. The author has separately confirmed the reported validation claims and measurements.
-
-The current repository records the following validated results:
-
-| Source | Packets / capture | Detected | Z-score | Confidence | MITRE TTP |
-|---|---:|---|---:|---|---|
-| Merlin QUIC C2 | 490,565 packets / 521 sessions | YES | 14.76 | HIGH | T1573.002 |
-| Cobalt Strike | Real PCAP | YES | 7.01 | MEDIUM | T1027 |
-| IcedID | Real PCAP | YES | 3.89 | LOW | T1027 |
-
-The validated false-positive baseline is **0% across 5 normal traffic patterns and 100 test runs**, as documented by the project owner.
-
-## Architecture
-
-```text
-main.py                         CLI and PCAP ingestion
-api.py                          FastAPI API + security controls
-core/fade_engine.py             Entropy + z-score + rules + confidence
-core/explainability.py          Structured analyst evidence
-core/siem_exporter.py           SIEM output
-core/interoperability.py        Sigma + STIX 2.1 output
-core/detection_pack.py          Versioned detection metadata
-core/alert_dedup.py             Alert deduplication
-core/live_monitor.py            Live monitoring
-core/pcap_stream_processor.py   Streaming PCAP processing
-core/pcap_parallel_processor.py Parallel PCAP processing
-core/ml_stub.py                 Isolation Forest layer
-core/observability.py           Optional OpenTelemetry tracing
-core/volatility_adapter.py      Optional Volatility 3 integration boundary
-agents/                         Endpoint and multi-agent components
-satellite/                      AIS/ADS-B/GPS signal fusion
-mitre/                          ATT&CK mapping
-viz/                            Timeline visualization
-dashboard/                      Web dashboard
-```
+Compliance claims such as SOC 2 or ISO 27001 require organization-level policies, evidence, contracts and independent assessment; source code alone does not constitute certification.
 
 ## Testing
 
-Run everything locally:
-
 ```bash
-pytest -q
 python -m compileall -q .
+pytest -q
 python benchmarks/benchmark.py
-python -c "from core.detection_pack import detection_pack, validate_pack; validate_pack(detection_pack())"
+python -c "from core.detection_pack import detection_pack, validate_pack; validate_pack(detection_pack()); print('detection pack: OK')"
 ```
 
-GitHub Actions runs the complete test suite across Python 3.9–3.12, compiles all Python sources, executes the reproducible benchmark, and validates the detection pack.
+GitHub Actions runs the complete suite plus benchmark and detection-pack validation. A separate security workflow performs dependency auditing, CodeQL and secret scanning.
 
 ## Limitations
 
-- Real-world accuracy depends on traffic, signal quality, protocol behavior, and detector configuration.
-- The public benchmark is synthetic and deterministic; it is not a substitute for a large independent labeled corpus.
-- Volatility 3 support is optional and does not replace the existing simulated memory-artifact reference implementation.
-- Large PCAP processing remains workload-dependent.
-- ATT&CK mapping includes the project's implemented rule-based mappings; it is not a claim of complete STIX-native ATT&CK coverage.
+- Real-world detection quality depends on traffic, protocol behavior, signal quality and tuning.
+- The public benchmark is deterministic and synthetic; independent labeled corpora and third-party validation remain deployment/customer work.
+- Volatility 3 support is an optional integration boundary.
+- Large PCAP processing is workload-dependent and should be capacity-tested before committing SLOs.
+- ATT&CK mappings represent the implemented project mappings; they are not a claim of complete ATT&CK/STIX coverage.
+- Enterprise SSO, HA, multi-region operation, durable customer storage, queue infrastructure and compliance certification are deployment concerns rather than claims that the public repository provides a hosted SaaS control plane.
 
-## Roadmap
+## Documentation
 
-Future enterprise work includes multi-tenant federation, large-scale performance optimization, richer memory forensics, expanded detector packs, broader labeled benchmarks, and deeper SOC integrations.
+- `docs/ENTERPRISE_READINESS.md` — production controls and operational responsibilities
+- `docs/THREAT_MODEL.md` — assets, trust boundaries, threats and security invariants
+- `docs/CONTROL_MATRIX.md` — NIST/enterprise readiness mapping
+- `docs/adr/` — architecture decisions
+- `SECURITY.md` — responsible disclosure
+- `CONTRIBUTING.md` — contribution workflow
+- `CHANGELOG.md` — release history
 
 ## Contributing
 
-Bug reports, detection improvements, test cases, integrations, and documentation improvements are welcome. See `CONTRIBUTING.md` and `SECURITY.md`.
+Detection improvements, regression cases, integrations, benchmarks and documentation are welcome. All changes should preserve the detection evidence contract and pass CI/security checks.
 
 ## Related platform
 
