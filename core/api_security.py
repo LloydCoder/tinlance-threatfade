@@ -8,12 +8,15 @@ from fastapi import HTTPException, UploadFile
 
 MAX_PCAP_BYTES = int(os.getenv("THREATFADE_MAX_PCAP_BYTES", str(100 * 1024 * 1024)))
 API_KEY = os.getenv("THREATFADE_API_KEY")
+ENVIRONMENT = os.getenv("THREATFADE_ENV", "development").lower()
 RATE_LIMIT = int(os.getenv("THREATFADE_RATE_LIMIT", "120"))
 RATE_WINDOW_SECONDS = int(os.getenv("THREATFADE_RATE_WINDOW_SECONDS", "60"))
 _REQUESTS = defaultdict(deque)
 
 
 def require_api_key(x_api_key: Optional[str]) -> None:
+    if ENVIRONMENT == "production" and not API_KEY:
+        raise HTTPException(status_code=503, detail="Production API authentication is not configured")
     if API_KEY and x_api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
