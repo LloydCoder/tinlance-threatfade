@@ -2,16 +2,42 @@
 
 **Evasion Interception Platform** by Tinlance Limited.
 
-ThreatFade detects moments when adversaries intentionally reduce observable signals — including C2 quieting, gradual LOTL activity reduction and GNSS interference — using entropy analysis, statistical deviation, heuristic detection, confidence scoring, optional ML anomaly detection, ATT&CK mapping, SIEM interoperability and operational integrations.
+ThreatFade detects moments when adversaries intentionally reduce observable signals—including C2 quieting, gradual LOTL activity reduction and GNSS interference—using entropy analysis, statistical deviation, heuristic detection, confidence scoring, optional ML anomaly detection, ATT&CK mapping, SIEM interoperability and operational integrations.
 
 **Status:** v0.4.0 — enterprise engineering baseline  
 **License:** Apache 2.0 (open-core)
 
-## Enterprise posture
+## Product standard
 
-ThreatFade now includes the application-level foundations expected of an enterprise security product: native OIDC bearer-token validation, RBAC, tenant-scoped persistence, audit events, durable PostgreSQL reference deployment, hardened container/Kubernetes assets, readiness/SLO targets, investigation case primitives, SBOM/provenance-backed releases, keyless image signing and CI/security gates.
+ThreatFade is designed as an **evidence-first security operations product**, not a demo dashboard. The architecture separates control-plane concerns (identity, RBAC, tenant policy, configuration and audit) from detection workloads and keeps detection evidence structured so analysts and downstream systems can consume the same record.
 
-The repository does **not** claim that source code alone constitutes a SOC 2/ISO certification, third-party penetration test, independent detection validation, contractual SLA or proven production-scale result. Those are evidence and operational activities that must be performed against the actual deployment. See `docs/ENTERPRISE_IMPLEMENTATION.md`.
+The public repository provides enterprise engineering foundations: native OIDC/JWT validation, RBAC, tenant-scoped persistence, audit events, durable PostgreSQL reference deployment, hardened container/Kubernetes assets, readiness/SLO targets, investigation case primitives, SBOM/provenance-backed releases, keyless signing and CI/security gates.
+
+The repository does **not** claim that source code alone constitutes SOC 2/ISO certification, a third-party penetration test, independent detection validation, contractual SLA, or proven customer-scale performance. Those require real deployment evidence and independent or operational assurance. See `docs/ENTERPRISE_IMPLEMENTATION.md`.
+
+## Enterprise analyst console
+
+The dashboard is intentionally organized around the analyst's investigation loop:
+
+**Prioritize → Inspect evidence → Pivot → Disposition → Export / hand off**
+
+The current console provides:
+
+- Operational overview with open-alert, confidence, detection-rate and score metrics.
+- Severity filtering and time-window controls.
+- Detection activity visualization.
+- Priority alert queue with investigation drill-down.
+- Structured evidence drawer with confidence, score, z-score, ATT&CK and ML context.
+- Detection records table with direct investigation access.
+- Safe scenario execution and ML-layer controls.
+- API health/version status and operational signal panel.
+- Responsive desktop/tablet/mobile layouts.
+- Keyboard-friendly drawer dismissal and explicit empty/error states.
+- A visual hierarchy designed to reduce cognitive load rather than maximize decorative telemetry.
+
+Dashboard design follows established observability principles: a dashboard should answer a defined operational question, use hierarchical drill-downs, avoid dashboard sprawl, and keep alert-driven navigation focused. urlGrafana dashboard best practiceshttps://grafana.com/docs/grafana/latest/visualizations/dashboards/build-dashboards/best-practices/
+
+The investigation model also follows modern SOC workflows in which an incident aggregates relevant alerts/evidence, exposes entities and a timeline, and allows analysts to pivot without losing investigation context. urlMicrosoft Sentinel incident investigation guidancehttps://learn.microsoft.com/en-us/azure/sentinel/investigate-incidents
 
 ## Quick start
 
@@ -24,7 +50,7 @@ pip install -r requirements.txt
 python api.py
 ```
 
-Check readiness:
+Open the dashboard at `http://localhost:8080/dashboard/` and check readiness:
 
 ```bash
 curl http://localhost:8080/health
@@ -69,6 +95,7 @@ Signal / PCAP
   -> ATT&CK mapping
   -> JSON / SIEM / Sigma / STIX 2.1 / FusionOps
   -> tenant-scoped durable record + audit event
+  -> analyst investigation / case workflow
 ```
 
 ## Capabilities
@@ -135,7 +162,7 @@ Signal / PCAP
 
 Detection rules are versioned with stable IDs, semantic versions, descriptions and ATT&CK mappings. The intended lifecycle is:
 
-**Research -> Backtest -> Canary -> Production -> Deprecated**
+**Research → Backtest → Canary → Production → Deprecated**
 
 Current core rules include `TF-C2-001`, `TF-LOTL-001` and `TF-GNSS-001`.
 
@@ -197,6 +224,8 @@ Users / SIEM ---> TLS / Edge ---> ThreatFade Control Plane
                                   +---- Immutable Audit Sink
                                   |
                                   +---- SIEM / SOAR / FusionOps
+                                  |
+                                  +---- Analyst Console
 ```
 
 For HA deployments, run multiple API/worker replicas behind a load balancer, use managed PostgreSQL with backups and tested restore, use a durable queue/object store where workload volume requires it, and configure regional/data-residency controls. The public repository provides the reference components; the production topology must be capacity-tested and operated for the customer's SLOs.
