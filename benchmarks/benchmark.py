@@ -4,6 +4,8 @@ import time
 from pathlib import Path
 from typing import Dict, List
 
+import numpy as np
+
 from agents.signal_generator import generate_signals
 from core.fade_engine import detect_fade
 
@@ -18,7 +20,8 @@ SCENARIOS = {
 
 def run() -> Dict[str, object]:
     rows: List[Dict[str, object]] = []
-    for scenario, expected in SCENARIOS.items():
+    for index, (scenario, expected) in enumerate(SCENARIOS.items()):
+        np.random.seed(index + 1)
         timestamps, values = generate_signals(scenario)
         start = time.perf_counter()
         result = detect_fade(timestamps, values)
