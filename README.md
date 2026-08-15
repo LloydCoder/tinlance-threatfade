@@ -1,221 +1,248 @@
 # ThreatFade
 
-**Evasion Interception Platform** by Tinlance Limited
+**Evasion Interception Platform** by Tinlance Limited.
 
-ThreatFade detects moments when adversaries intentionally silence their signals — C2 channels go quiet, process artifacts vanish, GNSS gets jammed. It reconstructs the pattern using entropy analysis, z-score anomaly detection, and rule-based matching.
+ThreatFade detects moments when adversaries intentionally reduce observable signals — for example C2 quieting, gradual LOTL activity reduction, and GNSS interference — and reconstructs the event using entropy analysis, z-score anomaly detection, heuristic rules, confidence scoring, optional ML anomaly detection, MITRE ATT&CK mapping, SIEM export, and operational integrations.
 
-**Status:** v0.3.0
+**Status:** v0.4.0
 **License:** Apache 2.0 (open-core)
-© 2026 Tinlance Limited
 
----
+## Quick start
 
-## Quick Start
 ```bash
 git clone https://github.com/LloydCoder/tinlance-threatfade.git
 cd tinlance-threatfade
-python -m venv venv && source venv/bin/activate
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-
-# Run on simulated data
 python main.py
-
-# Run directly on a PCAP file
-python main.py --pcap path/to/capture.pcapng --export json
-
-# Export to different SIEM formats
-python main.py --scenario c2_quieting --export splunk
-python main.py --scenario c2_quieting --export cef
-python main.py --scenario c2_quieting --export csv
 ```
 
-## What It Does
+Run the API:
 
-ThreatFade analyses network signals (from simulation or real PCAP captures) and flags fade events — periods where an adversary deliberately reduces or hides their footprint.
-
-**Detection pipeline:** Raw signal → rolling Shannon entropy → z-score outlier detection → heuristic rule matching → confidence scoring → MITRE TTP classification → SIEM export + alert + visualization.
-
-**Current capabilities:**
-
-- Direct PCAP/PCAPNG ingestion (via --pcap flag)
-- 5 simulated threat scenarios (C2 quieting, LOTL gradual, GNSS jam, mixed, normal-with-fade)
-- Confidence scoring (critical / high / medium / low / info)
-- SIEM export to JSON, Splunk HEC, CEF syslog, and CSV
-- MITRE ATT&CK TTP stub mapping
-- Volatility memory artifact simulation (reference)
-- Dark-mode PNG timeline visualization
-- Telegram alerts with attached visualization
-- Runs completely offline
-
-## SIEM Integration
-
-ThreatFade exports detection results directly to common SIEM formats. No additional tooling required.
-
-**JSON (default)** — structured report for Splunk, ELK, or custom pipelines:
 ```bash
-python main.py --pcap capture.pcapng --export json
+python api.py
+curl http://localhost:8080/health
 ```
 
-**Splunk HEC** — ready for HTTP Event Collector ingestion:
+## Detection pipeline
+
+```text
+Signal / PCAP
+     ↓
+Signal extraction
+     ↓
+Rolling entropy + statistical deviation
+     ↓
+Heuristic detection rules
+     ↓
+Optional Isolation Forest anomaly layer
+     ↓
+Confidence + evidence
+     ↓
+MITRE ATT&CK mapping
+     ↓
+SIEM / Sigma / STIX 2.1 / FusionOps
+```
+
+## Current capabilities
+
+### Detection and analytics
+
+- Direct PCAP/PCAPNG ingestion
+- Hybrid encrypted/unencrypted PCAP signal extraction
+- Rolling Shannon entropy analysis
+- Z-score anomaly detection
+- Rule-based fade detection
+- Confidence scoring: critical/high/medium/low/info
+- Optional Isolation Forest ML anomaly layer
+- Structured, analyst-readable detection evidence
+- Alert deduplication
+- Multi-agent coordination
+- Live network/process monitoring
+- Satellite signal fusion: AIS/ADS-B/GPS
+
+### Threat scenarios
+
+- C2 quieting
+- LOTL gradual reduction
+- GNSS jamming
+- Mixed threat activity
+- Normal traffic with temporary signal dips for false-positive testing
+
+### Interoperability
+
+- JSON
+- Splunk HEC
+- CEF
+- CSV
+- Sigma-compatible detection output
+- STIX 2.1-compatible bundles
+- MITRE ATT&CK mapping
+- FusionOps integration
+
+### Operational API
+
+FastAPI endpoints include:
+
+- `GET /health`
+- `GET /version`
+- `POST /detect`
+- `POST /detect/scenario`
+- `POST /detect/pcap`
+
+The API supports optional API-key authentication, request rate limiting, configurable PCAP upload limits, configurable CORS origins, input validation, temporary-file cleanup, and structured evidence responses.
+
+Configure production controls with `.env`:
+
+```text
+THREATFADE_API_KEY=
+THREATFADE_MAX_PCAP_BYTES=104857600
+THREATFADE_RATE_LIMIT=120
+THREATFADE_RATE_WINDOW_SECONDS=60
+THREATFADE_ALLOWED_ORIGINS=http://localhost:8080
+```
+
+If `THREATFADE_API_KEY` is configured, protected detection endpoints require `X-API-Key`.
+
+## Detection evidence
+
+Every API detection now exposes structured evidence rather than only a verdict:
+
+```json
+{
+  "summary": "sustained reduction in signal activity; statistically significant deviation from baseline",
+  "signals": [
+    "sustained reduction in signal activity",
+    "statistically significant deviation from baseline"
+  ],
+  "metrics": {
+    "score": 0.81,
+    "entropy": 1.12,
+    "drop_ratio": 0.67,
+    "z_outlier": 7.01,
+    "rules_matched": 2
+  },
+  "fade_start": 42
+}
+```
+
+This is designed for analysts and downstream automation: the system records **why** a detection fired, not merely that it fired.
+
+## Detection packs
+
+ThreatFade includes versioned detection-pack metadata with stable rule IDs, semantic versions, descriptions, and ATT&CK mappings.
+
+Current core rules include:
+
+- `TF-C2-001` — C2 signal fade
+- `TF-LOTL-001` — LOTL gradual fade
+- `TF-GNSS-001` — GNSS interference
+
+## Benchmarking
+
+The repository contains a reproducible synthetic benchmark:
+
 ```bash
-python main.py --pcap capture.pcapng --export splunk
+python benchmarks/benchmark.py
 ```
 
-**CEF** — Common Event Format for syslog-based SIEMs (ArcSight, QRadar):
-```bash
-python main.py --pcap capture.pcapng --export cef
-```
+It evaluates expected detection/non-detection across the deterministic scenario suite and records accuracy, confidence, score, and detector latency in `reports/benchmarks/`.
 
-**CSV** — for spreadsheet analysis or custom tooling:
-```bash
-python main.py --pcap capture.pcapng --export csv
-```
+The benchmark is deliberately separate from the project's real-PCAP validation. Real-PCAP results remain documented as validation evidence rather than being mixed with synthetic test metrics.
 
-All exports are saved to `reports/siem/` with timestamped filenames.
+## Adversarial testing
 
-## Real-World Validation
+The test suite covers robustness against:
 
-Tested on real malware traffic from Active Countermeasures:
+- jitter/noisy signals
+- sustained fades
+- constant signals
+- extreme values
+- minimum-length inputs
+- configuration boundaries
+- false-positive scenarios
 
-| Source | Packets | Sessions | Detected | Z-Score | Confidence | MITRE TTP |
-|--------|---------|----------|----------|---------|------------|-----------|
-| Merlin QUIC C2 | 490,565 | 521 | YES | 14.76 | HIGH | T1573.002 |
-| Cobalt Strike | Real PCAP | - | YES | 7.01 | MEDIUM | T1027 |
-| IcedID | Real PCAP | - | YES | 3.89 | LOW | T1027 |
+The goal is to make evasion detection resilient without treating synthetic tests as proof of universal real-world accuracy.
 
-False-positive baseline: **0%** across 5 normal traffic patterns (100 test runs).
+## Memory analysis
+
+ThreatFade retains the existing simulated Volatility artifact layer and now includes an optional `core/volatility_adapter.py` integration boundary for Volatility 3. The adapter validates memory-image inputs and reports whether the Volatility 3 runtime is available, allowing memory analysis to be added without making the base detector depend on the optional engine.
+
+## Observability
+
+`core/observability.py` provides optional OpenTelemetry tracing around detector execution. When the OpenTelemetry API is installed, ThreatFade creates `threatfade` spans; otherwise it safely falls back to a no-op implementation.
+
+## Real-world validation
+
+The project has been validated by the author against real malware traffic and the existing repository validation corpus, including Merlin QUIC C2, Cobalt Strike, and IcedID. The author has separately confirmed the reported validation claims and measurements.
+
+The current repository records the following validated results:
+
+| Source | Packets / capture | Detected | Z-score | Confidence | MITRE TTP |
+|---|---:|---|---:|---|---|
+| Merlin QUIC C2 | 490,565 packets / 521 sessions | YES | 14.76 | HIGH | T1573.002 |
+| Cobalt Strike | Real PCAP | YES | 7.01 | MEDIUM | T1027 |
+| IcedID | Real PCAP | YES | 3.89 | LOW | T1027 |
+
+The validated false-positive baseline is **0% across 5 normal traffic patterns and 100 test runs**, as documented by the project owner.
 
 ## Architecture
+
+```text
+main.py                         CLI and PCAP ingestion
+api.py                          FastAPI API + security controls
+core/fade_engine.py             Entropy + z-score + rules + confidence
+core/explainability.py          Structured analyst evidence
+core/siem_exporter.py           SIEM output
+core/interoperability.py        Sigma + STIX 2.1 output
+core/detection_pack.py          Versioned detection metadata
+core/alert_dedup.py             Alert deduplication
+core/live_monitor.py            Live monitoring
+core/pcap_stream_processor.py   Streaming PCAP processing
+core/pcap_parallel_processor.py Parallel PCAP processing
+core/ml_stub.py                 Isolation Forest layer
+core/observability.py           Optional OpenTelemetry tracing
+core/volatility_adapter.py      Optional Volatility 3 integration boundary
+agents/                         Endpoint and multi-agent components
+satellite/                      AIS/ADS-B/GPS signal fusion
+mitre/                          ATT&CK mapping
+viz/                            Timeline visualization
+dashboard/                      Web dashboard
 ```
-main.py                      Entry point, CLI, PCAP ingestion
-core/fade_engine.py          Detection logic (entropy + z-score + rules + confidence)
-core/siem_exporter.py        SIEM export (JSON, Splunk HEC, CEF, CSV)
-agents/signal_generator.py   Multi-scenario signal simulation
-viz/timeline_plot.py         Dark-mode PNG visualization
-mitre/rule_parser.py         MITRE TTP stub matching
-volatility/memory_sim.py     Volatility artifact simulation (reference)
-alerts/telegram_alert.py     Telegram alert integration
-agents/endpoint_agent.py     Endpoint agent stub (Linux/Windows)
-```
-
-## Endpoint Agent
-
-Lightweight agent that monitors local network connections or process activity and runs fade detection.
-
-```bash
-# Monitor network connections for 60 seconds
-python agents/endpoint_agent.py --mode network --duration 60 --interval 5 --export json
-
-# Monitor process activity
-python agents/endpoint_agent.py --mode process --duration 60 --interval 5 --export cef
-```
-
-Supports Linux, Windows, and macOS. Exports to all SIEM formats.
 
 ## Testing
-```bash
-# Unit tests (22 tests covering detection, confidence, edge cases)
-pytest test_fade_engine.py -v
 
-# False-positive baseline (5 normal traffic patterns, 100 runs)
-python test_false_positives.py
-```
-
-## REST API
-
-ThreatFade includes a FastAPI REST server for integration with external tools and SIEM pipelines.
+Run everything locally:
 
 ```bash
-# Start the API server
-python api.py
-# Server runs on http://localhost:8080
-
-# Check health
-curl http://localhost:8080/health
-
-# Detect from signal values
-curl -X POST http://localhost:8080/detect \
-  -H "Content-Type: application/json" \
-  -d '{"values": [0.9,0.9,0.05,0.05,0.05,0.9,0.9,0.9,0.9,0.9,0.9,0.9], "use_ml": true}'
-
-# Detect from scenario
-curl -X POST http://localhost:8080/detect/scenario \
-  -H "Content-Type: application/json" \
-  -d '{"scenario": "c2_quieting", "use_ml": true}'
-
-# Upload PCAP for analysis
-curl -X POST http://localhost:8080/detect/pcap \
-  -F "file=@capture.pcapng"
+pytest -q
+python -m compileall -q .
+python benchmarks/benchmark.py
+python -c "from core.detection_pack import detection_pack, validate_pack; validate_pack(detection_pack())"
 ```
 
-Full API docs available at: http://localhost:8080/docs (auto-generated by FastAPI)
-
-## Q2 2026 Progress
-
-| Milestone | Status |
-|-----------|--------|
-| Real PCAP ingestion | ✅ Complete |
-| Confidence scoring | ✅ Complete |
-| False-positive baseline (0%) | ✅ Complete |
-| SIEM export (JSON/Splunk/CEF/CSV) | ✅ Complete |
-| Endpoint agent stubs (Linux/Windows) | ✅ Complete |
-| ML anomaly layer (Isolation Forest) | ✅ Complete |
-| First 50-100 beta testers | In progress |
-
-## Roadmap
-
-**Q3 2026:** ✅ Complete — REST API, satellite fusion (AIS/ADS-B/GPS), MITRE ATT&CK v14, web dashboard, multi-agent coordination, alert deduplication.
-
-**Q4 2026:** Enterprise multi-tenant federation, performance optimization for large-scale captures, quantum-resistant transport layer.
+GitHub Actions runs the complete test suite across Python 3.9–3.12, compiles all Python sources, executes the reproducible benchmark, and validates the detection pack.
 
 ## Limitations
 
-- **Real-world accuracy:** Validated on 3 real PCAPs (Merlin QUIC, Cobalt Strike, IcedID). FP rate 0% on synthetic normal traffic.
-- **MITRE mapping:** Full ATT&CK v14 rule-based matching (11 sub-techniques, not STIX parsing).
-- **Volatility:** Simulated artifacts only. No real memory dump parsing yet.
-- **Scale:** Tested on datasets under 1 GB.
+- Real-world accuracy depends on traffic, signal quality, protocol behavior, and detector configuration.
+- The public benchmark is synthetic and deterministic; it is not a substitute for a large independent labeled corpus.
+- Volatility 3 support is optional and does not replace the existing simulated memory-artifact reference implementation.
+- Large PCAP processing remains workload-dependent.
+- ATT&CK mapping includes the project's implemented rule-based mappings; it is not a claim of complete STIX-native ATT&CK coverage.
 
-## Configuration
+## Roadmap
 
-Detection thresholds: `config.yaml`. Telegram alerts: copy `.env.example` to `.env` and fill in your bot token.
+Future enterprise work includes multi-tenant federation, large-scale performance optimization, richer memory forensics, expanded detector packs, broader labeled benchmarks, and deeper SOC integrations.
 
 ## Contributing
 
-Found a bug? Want to improve detection logic? Open an issue or pull request. See CONTRIBUTING.md for guidelines.
+Bug reports, detection improvements, test cases, integrations, and documentation improvements are welcome. See `CONTRIBUTING.md` and `SECURITY.md`.
 
-## License
+## Related platform
 
-Apache 2.0 for the open-core base. Proprietary extensions reserved to Tinlance Limited.
+ThreatFade is designed to feed Tinlance's operational security stack, including FusionOps.
 
-## Contact
-
-- **GitHub Issues:** Bug reports and feature requests
-- **Twitter:** [@lloydcoder](https://twitter.com/lloydcoder)
-- **Email:** lloydcoder@protonmail.com
-
-Built by Nwachukwu Chinaemerem ([@lloydcoder](https://github.com/LloydCoder))
-Tinlance Limited — Nigeria
-
-## Q3 2026 Progress
-
-| Milestone | Status |
-|-----------|--------|
-| REST API (FastAPI) | ✅ Complete |
-| Live network monitoring | ✅ Complete |
-| Alert deduplication | ✅ Complete |
-| Full MITRE ATT&CK v14 mapping | ✅ Complete |
-| Satellite Signal Fusion (AIS/ADS-B/GPS) | ✅ Complete |
-| Web dashboard (dark cyberpunk UI) | ✅ Complete |
-| Multi-agent coordination | ✅ Complete |
-
-## Beta Validation
-
-**Case Study #001** — Engr Uzoma (Cybersecurity Expert, Forex Engineer, Full Stack Developer):
-> "I've tested all scenarios as asked and I found no bugs. Everything passed. It's solid."
-
-See [docs/CASE_STUDY_001.md](docs/CASE_STUDY_001.md) for full details.
-
-## Live Integrations
-
-ThreatFade's REST API is consumed by:
-- **FusionOps v0.3.0** — Live SOC dashboard at http://13.50.16.19
+**Built by Nwachukwu Chinaemerem (@LloydCoder)**  
+**Tinlance Limited**
