@@ -21,4 +21,5 @@ jobs:
       - name: Run reproducible benchmark
         run: python benchmarks/benchmark.py
       - name: Validate detection pack
-        run: python -c "from core.detection_pack import detection_pack, validate_pack; validate_pack(detection_pack()); print('detection pack: OK')"
+        run: |
+          python -c "from core.detection_pack import detection_pack, validate_pack; validate_pack(detection_pack()); print('detection pack: OK')"
