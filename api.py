@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""ThreatFade REST API v0.4.0 with evidence, interoperability and API hardening."""
+"""ThreatFade REST API with production security and observability controls."""
 import math
 import os
 import tempfile
+import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -11,6 +12,7 @@ from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from agents.signal_generator import generate_signals
 from core.api_security import enforce_rate_limit, read_limited_upload, require_api_key, validate_pcap_upload
@@ -24,13 +26,49 @@ from mitre.rule_parser import match_mitre_ttp
 with open("config.yaml", "r", encoding="utf-8") as f:
     CONFIG = yaml.safe_load(f)
 
-app = FastAPI(title="ThreatFade API", description="Evasion Interception Platform — REST API for fade detection", version=CONFIG["branding"]["version"])
-allowed_origins = [x.strip() for x in os.getenv("THREATFADE_ALLOWED_ORIGINS", "*").split(",") if x.strip()]
-app.add_middleware(CORSMiddleware, allow_origins=allowed_origins, allow_methods=["GET", "POST"], allow_headers=["Content-Type", "X-API-Key"])
+ENVIRONMENT = os.getenv("THREATFADE_ENV", "development").lower()
+MAX_BODY_BYTES = int(os.getenv("THREATFADE_MAX_BODY_BYTES", str(2 * 1024 * 1024)))
+allowed_origins = [x.strip() for x in os.getenv("THREATFADE_ALLOWED_ORIGINS", "http://localhost:8080").split(",") if x.strip()]
+if ENVIRONMENT == "production" and "*" in allowed_origins:
+    raise RuntimeError("Wildcard CORS is forbidden in production")
+
+app = FastAPI(title="ThreatFade API", description="Evasion Interception Platform", version=CONFIG["branding"]["version"], docs_url="/docs", redoc_url="/redoc")
+app.add_middleware(CORSMiddleware, allow_origins=allowed_origins, allow_methods=["GET", "POST"], allow_headers=["Content-Type", "X-API-Key", "Authorization", "X-Request-ID"])
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        if request.headers.get("Content-Length"):
+            try:
+                if int(request.headers["Content-Length"]) > MAX_BODY_BYTES:
+                    return await _json_error(413, "Request body exceeds configured limit", request_id)
+            except ValueError:
+                return await _json_error(400, "Invalid Content-Length", request_id)
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["Cache-Control"] = "no-store" if request.url.path.startswith("/detect") else "no-cache"
+        if ENVIRONMENT == "production":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
+
+
+async def _json_error(status: int, detail: str, request_id: str):
+    from fastapi.responses import JSONResponse
+    response = JSONResponse(status_code=status, content={"detail": detail, "request_id": request_id})
+    response.headers["X-Request-ID"] = request_id
+    return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 class DetectRequest(BaseModel):
-    values: List[float] = Field(..., max_length=100000)
+    values: List[float] = Field(..., min_length=12, max_length=100000)
     timestamps: Optional[List[float]] = None
     use_ml: bool = False
     export_format: Optional[str] = None
@@ -129,7 +167,7 @@ def _pcap_to_signals(pcap_path: str, interval_sec: int = 5):
     try:
         packets = rdpcap(pcap_path)
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Invalid or unreadable PCAP: {exc}") from exc
+        raise HTTPException(status_code=400, detail="Invalid or unreadable PCAP") from exc
     events = []
     for pkt in packets:
         if IP not in pkt:
@@ -176,6 +214,15 @@ def health():
     return {"status": "ok", "tool": "ThreatFade", "version": CONFIG["branding"]["version"], "company": CONFIG["branding"]["company"], "timestamp": datetime.now().isoformat()}
 
 
+@app.get("/ready")
+def readiness():
+    checks = {"config": bool(CONFIG), "dashboard": os.path.exists("dashboard/index.html")}
+    ready = all(checks.values())
+    if not ready:
+        raise HTTPException(status_code=503, detail={"status": "not_ready", "checks": checks})
+    return {"status": "ready", "checks": checks, "version": CONFIG["branding"]["version"]}
+
+
 @app.get("/version")
 def version():
     return {"name": CONFIG["branding"]["name"], "version": CONFIG["branding"]["version"], "company": CONFIG["branding"]["company"], "license": "Apache 2.0 (open-core)"}
@@ -184,10 +231,13 @@ def version():
 @app.post("/detect", response_model=DetectionResponse)
 def detect(req: DetectRequest, request: Request, x_api_key: Optional[str] = Header(default=None)):
     _guard(request, x_api_key)
-    if len(req.values) < 12:
-        raise HTTPException(status_code=400, detail=f"Need at least 12 signal values, got {len(req.values)}")
-    if req.timestamps is not None and len(req.timestamps) != len(req.values):
-        raise HTTPException(status_code=400, detail="timestamps length must match values length")
+    if any(not math.isfinite(v) for v in req.values):
+        raise HTTPException(status_code=400, detail="Signal values must be finite numbers")
+    if req.timestamps is not None:
+        if len(req.timestamps) != len(req.values):
+            raise HTTPException(status_code=400, detail="timestamps length must match values length")
+        if any(not math.isfinite(v) for v in req.timestamps):
+            raise HTTPException(status_code=400, detail="timestamps must be finite numbers")
     timestamps = req.timestamps or list(range(len(req.values)))
     result = _run_detection(timestamps, req.values, req.use_ml)
     return _build_response(result, match_mitre_ttp(result) if result["detected"] else "None", "api_detect", req.export_format)
@@ -198,14 +248,16 @@ async def detect_pcap(request: Request, file: UploadFile = File(...), use_ml: bo
     _guard(request, x_api_key)
     validate_pcap_upload(file)
     content = await read_limited_upload(file)
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pcap") as tmp:
+    suffix = ".pcapng" if (file.filename or "").lower().endswith(".pcapng") else ".pcap"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content); tmp_path = tmp.name
     try:
         timestamps, values = _pcap_to_signals(tmp_path); result = _run_detection(timestamps, values, use_ml)
     finally:
         try: os.unlink(tmp_path)
         except FileNotFoundError: pass
-    return _build_response(result, match_mitre_ttp(result) if result["detected"] else "None", (file.filename or "upload").replace(" ", "_"), export_format)
+    safe_source = "upload"
+    return _build_response(result, match_mitre_ttp(result) if result["detected"] else "None", safe_source, export_format)
 
 
 @app.post("/detect/scenario", response_model=DetectionResponse)
