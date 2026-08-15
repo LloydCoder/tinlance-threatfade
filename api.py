@@ -68,7 +68,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 
 class DetectRequest(BaseModel):
-    values: List[float] = Field(..., min_length=12, max_length=100000)
+    values: List[float] = Field(..., max_length=100000)
     timestamps: Optional[List[float]] = None
     use_ml: bool = False
     export_format: Optional[str] = None
@@ -231,6 +231,8 @@ def version():
 @app.post("/detect", response_model=DetectionResponse)
 def detect(req: DetectRequest, request: Request, x_api_key: Optional[str] = Header(default=None)):
     _guard(request, x_api_key)
+    if len(req.values) < 12:
+        raise HTTPException(status_code=400, detail=f"Need at least 12 signal values, got {len(req.values)}")
     if any(not math.isfinite(v) for v in req.values):
         raise HTTPException(status_code=400, detail="Signal values must be finite numbers")
     if req.timestamps is not None:
@@ -256,8 +258,7 @@ async def detect_pcap(request: Request, file: UploadFile = File(...), use_ml: bo
     finally:
         try: os.unlink(tmp_path)
         except FileNotFoundError: pass
-    safe_source = "upload"
-    return _build_response(result, match_mitre_ttp(result) if result["detected"] else "None", safe_source, export_format)
+    return _build_response(result, match_mitre_ttp(result) if result["detected"] else "None", "upload", export_format)
 
 
 @app.post("/detect/scenario", response_model=DetectionResponse)
