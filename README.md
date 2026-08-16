@@ -2,42 +2,42 @@
 
 **Evasion Interception Platform** by Tinlance Limited.
 
-ThreatFade detects moments when adversaries intentionally reduce observable signals—including C2 quieting, gradual LOTL activity reduction and GNSS interference—using entropy analysis, statistical deviation, heuristic detection, confidence scoring, optional ML anomaly detection, ATT&CK mapping, SIEM interoperability and operational integrations.
+ThreatFade detects moments when adversaries intentionally reduce observable signals—including C2 quieting, gradual living-off-the-land activity reduction and GNSS interference—using entropy analysis, statistical deviation, heuristic detection, confidence scoring, optional ML anomaly detection, ATT&CK mapping, interoperable exports and operational integrations.
 
 **Status:** v0.4.0 — enterprise engineering baseline  
 **License:** Apache 2.0 (open-core)
 
-## Product standard
+## What ThreatFade is
 
-ThreatFade is designed as an **evidence-first security operations product**, not a demo dashboard. The architecture separates control-plane concerns (identity, RBAC, tenant policy, configuration and audit) from detection workloads and keeps detection evidence structured so analysts and downstream systems can consume the same record.
+ThreatFade is an **evidence-first detection and investigation platform**. Its core thesis is that adversarial activity can become less observable on purpose. Instead of treating a reduction in network or signal activity as automatically benign, ThreatFade models the change, scores the deviation and preserves the evidence required for analyst review.
 
-The public repository provides enterprise engineering foundations: native OIDC/JWT validation, RBAC, tenant-scoped persistence, audit events, durable PostgreSQL reference deployment, hardened container/Kubernetes assets, readiness/SLO targets, investigation case primitives, SBOM/provenance-backed releases, keyless signing and CI/security gates.
+The product is designed around one operational loop:
 
-The repository does **not** claim that source code alone constitutes SOC 2/ISO certification, a third-party penetration test, independent detection validation, contractual SLA, or proven customer-scale performance. Those require real deployment evidence and independent or operational assurance. See `docs/ENTERPRISE_IMPLEMENTATION.md`.
+**Prioritize → Inspect → Pivot → Disposition → Handoff**
 
-## Enterprise analyst console
+The repository contains the detection engine, API, analyst console, validation/benchmarking framework, interoperability layer and enterprise engineering foundations. It does not claim that source code alone proves SOC 2/ISO certification, third-party penetration testing, independent detection validation, contractual SLAs or customer-scale performance. Those require real operational and independent assurance.
 
-The dashboard is intentionally organized around the analyst's investigation loop:
+## ThreatFade Dashboard
 
-**Prioritize → Inspect evidence → Pivot → Disposition → Export / hand off**
+The repository includes a dedicated **ThreatFade Dashboard** (`dashboard/index.html`) designed as a SOC investigation console rather than a decorative telemetry page.
 
-The current console provides:
+The current UX includes:
 
-- Operational overview with open-alert, confidence, detection-rate and score metrics.
-- Severity filtering and time-window controls.
-- Detection activity visualization.
-- Priority alert queue with investigation drill-down.
-- Structured evidence drawer with confidence, score, z-score, ATT&CK and ML context.
-- Detection records table with direct investigation access.
-- Safe scenario execution and ML-layer controls.
-- API health/version status and operational signal panel.
+- Priority queue for evidence-backed detections.
+- Open-alert, high-confidence, detection-rate, score and platform-health KPIs.
+- Recent detection activity visualization.
+- Tenant-scoped detection-record table.
+- Investigation drawer with structured evidence, confidence, z-outlier, score and ATT&CK context.
+- Analyst disposition actions and an explicit investigation workflow.
+- Detection simulation controls for C2 quieting, LOTL gradual fade, GNSS jamming, normal-with-fade and mixed scenarios.
+- Optional ML anomaly layer.
+- API health/readiness and operational posture signals.
+- Validation posture showing repository evidence separately from external assurance.
 - Responsive desktop/tablet/mobile layouts.
-- Keyboard-friendly drawer dismissal and explicit empty/error states.
-- A visual hierarchy designed to reduce cognitive load rather than maximize decorative telemetry.
+- Keyboard-friendly investigation dismissal and explicit loading, empty and degraded states.
+- No third-party frontend dependency required for the reference console.
 
-Dashboard design follows established observability principles: a dashboard should answer a defined operational question, use hierarchical drill-downs, avoid dashboard sprawl, and keep alert-driven navigation focused. urlGrafana dashboard best practiceshttps://grafana.com/docs/grafana/latest/visualizations/dashboards/build-dashboards/best-practices/
-
-The investigation model also follows modern SOC workflows in which an incident aggregates relevant alerts/evidence, exposes entities and a timeline, and allows analysts to pivot without losing investigation context. urlMicrosoft Sentinel incident investigation guidancehttps://learn.microsoft.com/en-us/azure/sentinel/investigate-incidents
+The dashboard follows established observability guidance: operational dashboards should answer defined questions, keep hierarchy clear and support drill-down rather than maximizing the number of charts. OpenTelemetry likewise recommends common semantic conventions so telemetry can be correlated consistently across metrics, logs and traces. urlOpenTelemetry semantic conventionshttps://opentelemetry.io/docs/specs/semconv/
 
 ## Quick start
 
@@ -50,26 +50,103 @@ pip install -r requirements.txt
 python api.py
 ```
 
-Open the dashboard at `http://localhost:8080/dashboard/` and check readiness:
+Open:
+
+```text
+http://localhost:8080/dashboard/
+```
+
+Health/readiness:
 
 ```bash
 curl http://localhost:8080/health
 curl http://localhost:8080/ready
+curl http://localhost:8080/version
 ```
 
-For local development, authentication is intentionally permissive. Production requires an OIDC access token containing a tenant claim and appropriate roles.
+Local development is intentionally permissive. Production authentication is fail-closed and requires the configured identity boundary.
 
-## Production reference
+## Architecture
 
-The production Compose topology uses PostgreSQL for durable tenant-scoped data and persistent audit storage:
-
-```bash
-export POSTGRES_PASSWORD='use-a-secret-manager'
-export THREATFADE_OIDC_ISSUER='https://idp.example.com/realms/security'
-export THREATFADE_OIDC_AUDIENCE='threatfade-api'
-export THREATFADE_ALLOWED_ORIGINS='https://console.example.com'
-docker compose up --build
+```text
+                           Enterprise IdP
+                                │
+                           OIDC / JWT
+                                │
+Users / SIEM ── TLS / Edge ── ThreatFade Control Plane
+                                │
+                  ┌─────────────┼─────────────┐
+                  │             │             │
+               Auth/RBAC   Tenant policy   Audit
+                  │             │             │
+                  └─────────────┼─────────────┘
+                                │
+                         Detection Data Plane
+                                │
+                  PCAP / live signals / ML
+                                │
+                    Detection + Evidence Engine
+                                │
+          ┌─────────────────────┼────────────────────┐
+          │                     │                    │
+       Postgres             Object/export        Telemetry
+          │                     │                    │
+          └─────────────── Analyst Console ──────────┘
+                                │
+                JSON / Sigma / STIX / SIEM / FusionOps
 ```
+
+The implementation separates control-plane concerns from detection workloads. Detection records and audit events are tenant-scoped; production deployments use durable PostgreSQL persistence.
+
+## Detection pipeline
+
+```text
+Signal / PCAP
+  → signal extraction
+  → rolling entropy + statistical deviation
+  → detection rules
+  → optional ML anomaly layer
+  → confidence + structured evidence
+  → ATT&CK mapping
+  → JSON / SIEM / Sigma / STIX 2.1 / FusionOps
+  → tenant-scoped durable record + audit event
+  → analyst investigation / disposition
+```
+
+## Detection capabilities
+
+- PCAP/PCAPNG ingestion.
+- Hybrid encrypted/unencrypted signal extraction.
+- Rolling Shannon entropy.
+- Z-score anomaly detection.
+- C2, LOTL and GNSS fade scenarios.
+- Optional Isolation Forest anomaly layer.
+- Structured evidence and confidence scoring.
+- Alert deduplication.
+- Live network/process monitoring components.
+- AIS/ADS-B/GPS signal-fusion components.
+- Deterministic benchmarks and robustness tests.
+
+### Detection-as-code
+
+Detection packs use stable IDs, semantic versions, descriptions and ATT&CK mappings. The intended lifecycle is:
+
+**Research → Backtest → Canary → Production → Deprecated**
+
+Core rules include `TF-C2-001`, `TF-LOTL-001` and `TF-GNSS-001`.
+
+## Enterprise identity and tenancy
+
+- OIDC/JWT validation with issuer, audience, JWKS and time-claim validation.
+- RBAC roles: `viewer`, `analyst`, `api_only`, `admin`, `tenant_admin`.
+- Tenant-scoped detection persistence.
+- Cross-tenant access denied by default.
+- Tenant-admin/platform-admin separation.
+- Production fail-closed authentication.
+- Append-oriented audit events with request and principal context.
+- PostgreSQL production persistence through SQLAlchemy.
+- SQLite development persistence.
+- Investigation case persistence primitives.
 
 Production OIDC settings:
 
@@ -79,120 +156,106 @@ THREATFADE_OIDC_AUDIENCE
 THREATFADE_OIDC_JWKS_URL   # optional; issuer discovery is used when omitted
 ```
 
-Tokens must contain `sub`, `exp`, `iat` and a `tenant_id` claim (or the documented Tinlance namespaced equivalent). Supported roles are `viewer`, `analyst`, `api_only`, `admin` and `tenant_admin`.
+Production tokens must contain `sub`, `exp`, `iat` and a tenant claim using the documented tenant naming convention. Exact redirect URI registration, TLS, secure token handling and PKCE where applicable remain deployment requirements.
 
-OAuth/OIDC configuration should follow current OAuth security best practice, including exact redirect URI registration, PKCE where applicable, TLS and secure token handling.
+## Security and supply chain
 
-## Detection pipeline
+The repository includes:
 
-```text
-Signal / PCAP
-  -> signal extraction
-  -> rolling entropy + statistical deviation
-  -> detection rules
-  -> optional ML anomaly layer
-  -> confidence + structured evidence
-  -> ATT&CK mapping
-  -> JSON / SIEM / Sigma / STIX 2.1 / FusionOps
-  -> tenant-scoped durable record + audit event
-  -> analyst investigation / case workflow
-```
+- Bounded request and PCAP inputs.
+- Rate limiting.
+- Request IDs.
+- Restrictive CORS.
+- Security headers.
+- Finite-number validation.
+- Safe temporary PCAP handling.
+- Non-root container execution.
+- Dropped Linux capabilities.
+- `no-new-privileges`.
+- Kubernetes security context and health probes.
+- Dependabot.
+- CodeQL.
+- Gitleaks.
+- `pip-audit`.
+- SBOM generation.
+- Build provenance/attestation.
+- Keyless Sigstore signing for release images.
 
-## Capabilities
+## Interoperability
 
-### Detection
+ThreatFade supports:
 
-- PCAP/PCAPNG ingestion
-- Hybrid encrypted/unencrypted signal extraction
-- Rolling Shannon entropy
-- Z-score anomaly detection
-- C2, LOTL and GNSS fade scenarios
-- Optional Isolation Forest layer
-- Structured analyst evidence and confidence
-- Alert deduplication
-- Live network/process monitoring
-- AIS/ADS-B/GPS signal-fusion components
-- Deterministic benchmark and robustness tests
+- JSON.
+- Splunk HEC.
+- CEF.
+- CSV.
+- Sigma-compatible output.
+- STIX 2.1-compatible bundles.
+- MITRE ATT&CK mapping.
+- FusionOps integration.
 
-### Interoperability
-
-- JSON
-- Splunk HEC
-- CEF
-- CSV
-- Sigma-compatible output
-- STIX 2.1-compatible bundles
-- MITRE ATT&CK mapping
-- FusionOps integration
-
-### Enterprise identity and tenancy
-
-- OIDC/JWT validation using issuer, audience, JWKS and standard time claims
-- Explicit RBAC permission matrix
-- Tenant isolation on persisted detections
-- Cross-tenant access denied by default
-- Tenant-admin and platform-admin separation
-- Production fail-closed authentication
-- Structured append-only audit events
-- PostgreSQL production persistence through SQLAlchemy
-- SQLite development persistence
-- Investigation case persistence primitives
-
-### Security
-
-- Bounded request and PCAP inputs
-- Rate limiting
-- Request IDs
-- Security headers
-- Restrictive CORS
-- Finite-number validation
-- Safe temporary PCAP handling
-- Non-root hardened container
-- Dropped Linux capabilities
-- `no-new-privileges`
-- Kubernetes security context and probes
-- Dependabot
-- CodeQL
-- Gitleaks
-- `pip-audit`
-- SBOM/provenance generation on releases
-- Keyless Sigstore image signing
-
-## Detection packs
-
-Detection rules are versioned with stable IDs, semantic versions, descriptions and ATT&CK mappings. The intended lifecycle is:
-
-**Research → Backtest → Canary → Production → Deprecated**
-
-Current core rules include `TF-C2-001`, `TF-LOTL-001` and `TF-GNSS-001`.
+The goal is not to replace an enterprise SIEM/SOAR. ThreatFade provides a specialized detection/evidence layer that can feed existing security operations systems.
 
 ## Benchmarking and validation
 
-Run the deterministic benchmark:
+Run:
 
 ```bash
 python benchmarks/benchmark.py
 ```
 
-The benchmark is separate from real-PCAP validation. The repository records author-confirmed validation against Merlin QUIC C2, Cobalt Strike and IcedID and the documented 0% false-positive baseline across five normal traffic patterns and 100 test runs. These are project validation results, not universal accuracy guarantees.
+The deterministic benchmark is intentionally separate from real-PCAP validation. The repository records author-confirmed validation against Merlin QUIC C2, Cobalt Strike and IcedID and the documented 0% false-positive baseline across five normal traffic patterns and 100 test runs. These are project validation results—not universal accuracy guarantees.
 
-Independent labeled corpora, third-party penetration testing, purple-team exercises and customer-scale load testing are intentionally treated as external assurance activities rather than fabricated repository claims.
+Independent labeled corpora, third-party penetration testing, purple-team exercises and customer-scale load testing are external assurance activities and are not represented as completed merely because repository tests pass.
 
-## Observability, reliability and SLOs
+## Observability and reliability
 
-ThreatFade includes optional OpenTelemetry instrumentation, structured API request IDs, health/readiness endpoints, alert deduplication, streaming/parallel PCAP processors and operational export paths.
+ThreatFade includes optional OpenTelemetry instrumentation, request IDs, health/readiness endpoints, structured audit events, alert deduplication, streaming/parallel processing components and operational export paths.
 
-The readiness endpoint exposes configurable SLO targets for API availability, detection latency and RPO/RTO. These are **targets to measure**, not guarantees. Production teams should record p50/p95/p99 latency, throughput, error rate, alert volume, false-positive budget, resource utilization and recovery results under representative load.
+Production teams should measure:
 
-## Supply-chain security
+- API availability.
+- Detection p50/p95/p99 latency.
+- Throughput.
+- Error rate.
+- Alert volume.
+- False-positive budget.
+- Resource utilization.
+- Queue depth/backpressure where a distributed deployment is used.
+- Backup/restore results.
+- Recovery time and recovery point performance.
 
-Versioned releases build and push an immutable container to GHCR with build provenance/SBOM metadata, GitHub artifact attestation and keyless Sigstore signing. Consumers should verify provenance and signatures before promotion into a production registry.
+The readiness endpoint exposes configured SLO targets. Targets are **targets**, not guarantees; production evidence is required before publishing measured SLOs.
 
-## Governance and compliance
+## Deployment
+
+Reference local/production Compose assets are provided in the repository. A typical production boundary is:
+
+```bash
+export POSTGRES_PASSWORD='use-a-secret-manager'
+export THREATFADE_OIDC_ISSUER='https://idp.example.com/realms/security'
+export THREATFADE_OIDC_AUDIENCE='threatfade-api'
+export THREATFADE_ALLOWED_ORIGINS='https://console.example.com'
+docker compose up --build
+```
+
+For enterprise Kubernetes deployments, use the hardened container and Kubernetes assets, externalize secrets, configure TLS at the edge, use persistent storage, and connect application telemetry to the organization's observability backend.
+
+## Governance and assurance boundary
 
 The engineering baseline is informed by OWASP ASVS 5.0 and NIST CSF 2.0. Repository documentation includes a threat model, control matrix, architecture decisions, disclosure process and enterprise implementation boundary.
 
-SOC 2, ISO 27001, NIST CSF profiles, contractual SLAs, data-processing agreements, data residency commitments and regulatory certifications require organization-level governance, evidence and independent assessment.
+The following cannot be honestly self-certified by a repository:
+
+- SOC 2 / ISO 27001 certification.
+- Independent penetration testing.
+- Independent detection validation.
+- Contractual SLAs.
+- Customer-scale performance guarantees.
+- Data-residency commitments.
+- Organization-level incident-response obligations.
+
+Those require organizational controls, evidence, contracts and/or independent assessment.
 
 ## Testing
 
@@ -201,62 +264,34 @@ python -m compileall -q .
 pytest -q
 python benchmarks/benchmark.py
 python -c "from core.detection_pack import detection_pack, validate_pack; validate_pack(detection_pack()); print('detection pack: OK')"
+python scripts/enterprise_smoke.py
 ```
 
-GitHub Actions runs the complete suite on Python 3.11 and 3.12, benchmark, detection-pack validation, enterprise/dashboard smoke checks and production-container build. The security workflow runs dependency auditing, CodeQL and secret scanning.
+GitHub Actions validates Python 3.11 and 3.12, compilation, the complete test suite, benchmark, detection-pack validation, enterprise/dashboard smoke checks and production-container build. The security workflow covers dependency auditing, CodeQL and secret scanning.
 
-## Deployment architecture
+## Repository structure
 
 ```text
-                         Enterprise IdP
-                              |
-                         OIDC access token
-                              |
-Users / SIEM ---> TLS / Edge ---> ThreatFade Control Plane
-                                  |  auth / RBAC / tenant policy
-                                  |
-                                  +---- Detection Data Plane
-                                  |       PCAP / live / ML
-                                  |
-                                  +---- PostgreSQL
-                                  |       tenant-scoped state
-                                  |
-                                  +---- Immutable Audit Sink
-                                  |
-                                  +---- SIEM / SOAR / FusionOps
-                                  |
-                                  +---- Analyst Console
+ThreatFade/
+├── agents/             # signal-generation and endpoint components
+├── api.py              # FastAPI control/data-plane boundary
+├── benchmarks/         # reproducible validation
+├── core/               # detection, security, storage, evidence and observability
+├── dashboard/          # ThreatFade Dashboard / analyst console
+├── docs/               # enterprise, threat-model and architecture documentation
+├── integrations/       # external operational integrations
+├── mitre/              # ATT&CK mapping
+├── reports/            # generated validation/interoperability outputs
+├── scripts/             # enterprise smoke and operational tooling
+├── tests/               # unit/integration/security coverage
+├── Dockerfile
+├── docker-compose.yml
+└── .github/workflows/   # CI and security gates
 ```
 
-For HA deployments, run multiple API/worker replicas behind a load balancer, use managed PostgreSQL with backups and tested restore, use a durable queue/object store where workload volume requires it, and configure regional/data-residency controls. The public repository provides the reference components; the production topology must be capacity-tested and operated for the customer's SLOs.
+## License
 
-## Documentation
+Apache License 2.0. See `LICENSE`.
 
-- `docs/ENTERPRISE_IMPLEMENTATION.md` — implemented controls and assurance boundary
-- `docs/ENTERPRISE_READINESS.md` — production controls and operational responsibilities
-- `docs/THREAT_MODEL.md` — assets, trust boundaries, threats and security invariants
-- `docs/CONTROL_MATRIX.md` — enterprise readiness mapping
-- `docs/adr/` — architecture decisions
-- `SECURITY.md` — responsible disclosure
-- `CONTRIBUTING.md` — contribution workflow
-- `CHANGELOG.md` — release history
-
-## Limitations
-
-- Detection quality depends on traffic, protocol behavior, signal quality and tuning.
-- The public benchmark is deterministic and synthetic.
-- Independent validation and real customer load are not represented as completed work unless independently evidenced.
-- Volatility 3 support is an optional integration boundary.
-- Large PCAP processing is workload-dependent and should be capacity-tested before committing customer SLOs.
-- ATT&CK mappings represent implemented project mappings, not complete ATT&CK/STIX coverage.
-
-## Contributing
-
-Detection improvements, regression cases, integrations, benchmarks and documentation are welcome. All changes must preserve the detection evidence contract and pass CI/security checks.
-
-## Related platform
-
-ThreatFade is designed to feed Tinlance's operational security stack, including FusionOps.
-
-**Built by Nwachukwu Chinaemerem (@LloydCoder)**  
-**Tinlance Limited**
+**ThreatFade** — Tinlance Limited  
+https://tinlance.com/
