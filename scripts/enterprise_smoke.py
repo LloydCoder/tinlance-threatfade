@@ -2,18 +2,6 @@
 from pathlib import Path
 
 
-def _route_paths(routes):
-    paths = set()
-    for route in routes:
-        path = getattr(route, "path", None)
-        if path:
-            paths.add(path)
-        nested = getattr(route, "routes", None)
-        if nested:
-            paths.update(_route_paths(nested))
-    return paths
-
-
 def main() -> None:
     root = Path(__file__).resolve().parents[1]
     required = [
@@ -34,7 +22,7 @@ def main() -> None:
     import sys
     sys.path.insert(0, str(root))
     import enterprise_app
-    routes = _route_paths(enterprise_app.app.routes)
+    routes = set(enterprise_app.app.openapi().get("paths", {}))
     expected = {
         "/", "/health", "/ready", "/version", "/detect",
         "/detect/pcap", "/detect/scenario",
