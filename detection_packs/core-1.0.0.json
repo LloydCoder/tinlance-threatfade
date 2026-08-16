@@ -1,0 +1,10 @@
+{
+  "name": "ThreatFade Core Detection Pack",
+  "version": "1.0.0",
+  "status": "production",
+  "rules": [
+    {"rule_id": "TF-C2-001", "version": "1.0.0", "name": "C2 signal fade", "description": "Sustained reduction in observable C2 activity.", "mitre": ["T1027"]},
+    {"rule_id": "TF-LOTL-001", "version": "1.0.0", "name": "LOTL gradual fade", "description": "Gradual reduction in behavioral signal strength.", "mitre": ["T1218"]},
+    {"rule_id": "TF-GNSS-001", "version": "1.0.0", "name": "GNSS interference", "description": "Anomalous loss or disruption of navigation signals.", "mitre": ["T1562"]}
+  ]
+}
