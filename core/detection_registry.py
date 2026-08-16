@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Dict, List
 
 from core.detection_pack import validate_pack
 
-ROOT = Path(os.getenv("THREATFADE_DETECTION_PACK_DIR", "detection_packs")) if False else Path("detection_packs")
+ROOT = Path(os.getenv("THREATFADE_DETECTION_PACK_DIR", "detection_packs"))
 
 
 def load_pack(path: Path) -> Dict[str, object]:
