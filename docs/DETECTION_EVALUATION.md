@@ -1,39 +1,22 @@
 # ThreatFade Detection Evaluation Standard
 
-**Build:** Group 2 / Build 18  
-**Status:** implemented baseline  
-**Benchmark:** `synthetic-scenario-v2`
+**Group:** 2 — Detection Science & Validation  
+**Builds:** 18–23  
+**Status:** GREEN baseline complete; real-world validation remains an external evidence requirement
 
 ## Purpose
 
-ThreatFade must distinguish a useful detection claim from a benchmark artifact. The evaluation framework therefore separates **ground truth**, **detector output**, **metrics**, **uncertainty**, and **scenario-level results**.
+ThreatFade must distinguish a useful detection claim from a benchmark artifact. The evaluation framework separates **ground truth**, **detector output**, **metrics**, **uncertainty**, **score calibration**, **provenance**, and **scenario-level results**.
 
-NIST SP 800-55 Vol. 1 and Vol. 2 recommend a deliberate measurement program for selecting, evaluating, and using security measures rather than relying on a single headline number. urlNIST SP 800-55 Vol. 1https://csrc.nist.gov/pubs/sp/800/55/v1/final urlNIST SP 800-55 Vol. 2https://csrc.nist.gov/pubs/sp/800/55/v2/final
+NIST's current AI measurement guidance emphasizes documented test sets, metrics, methods, uncertainty, representative deployment conditions, repeatable TEVV, and independent assessment where appropriate. urlNIST AI RMF Measurehttps://airc.nist.gov/airmf-resources/airmf/5-sec-core/ MITRE's ATT&CK guidance similarly supports building, testing and refining behavioral analytics using threat-informed adversary behavior. urlMITRE ATT&CK detections and analyticshttps://attack.mitre.org/resources/get-started/detections-and-analytics/
 
-MITRE's ATT&CK analytics guidance likewise emphasizes building, testing, and refining behavioral analytics using adversary emulation and threat-informed evaluation. urlMITRE ATT&CK detections and analyticshttps://attack.mitre.org/resources/get-started/detections-and-analytics/
+## Implemented capabilities
 
-## Evaluation layers
+### Build 18 — Evaluation metrics
 
-### Layer 1 — Deterministic unit/regression tests
+`core/evaluation.py` reports:
 
-Purpose: detect accidental logic regressions quickly.
-
-Examples:
-
-- known synthetic C2 quieting;
-- LOTL gradual fade;
-- GNSS jamming;
-- benign temporary dip;
-- malformed/short signal inputs.
-
-### Layer 2 — Repeated synthetic evaluation
-
-`benchmarks/benchmark.py` runs **100 deterministic seeds per scenario** and evaluates:
-
-- true positives;
-- false positives;
-- true negatives;
-- false negatives;
+- TP/FP/TN/FN;
 - accuracy;
 - precision;
 - recall/sensitivity;
@@ -42,117 +25,92 @@ Examples:
 - false-positive rate;
 - false-negative rate;
 - balanced accuracy;
-- p50/p95/p99 latency;
-- bootstrap confidence intervals.
+- p50/p95/p99/max latency;
+- deterministic percentile bootstrap confidence intervals.
 
-The current synthetic regression gate requires all labeled malicious scenarios to remain detectable and the known benign `normal_with_fade` scenario to remain free of false positives. This is a **regression gate**, not a claim of real-world accuracy.
+### Build 19 — Ground-truth contract
 
-### Layer 3 — Labeled real-traffic evaluation
+`core/evaluation_corpus.py` enforces:
 
-Future real-PCAP evaluation must preserve:
+- stable case identity;
+- label and label-confidence vocabulary;
+- explicit evaluation split;
+- source SHA-256;
+- timezone-aware collection timestamps;
+- environment and provenance;
+- adversarial status;
+- duplicate/near-duplicate grouping;
+- cross-split leakage prevention.
 
-- dataset provenance;
-- collection environment;
-- time range;
-- sensor/source type;
-- protocol mix;
-- labeling authority;
-- labeling confidence;
-- duplicate/near-duplicate handling;
-- train/tune/test separation;
-- temporal holdout;
-- environment holdout;
-- adversarial/evasion status.
+`scripts/validate_ground_truth.py` is a CI gate.
 
-No test corpus should be tuned and evaluated on the same examples without a clearly documented limitation.
+### Build 20 — Score evaluation
 
-### Layer 4 — Threat-informed / purple-team evaluation
+When detector scores exist, the evaluator reports:
 
-Future evaluations should use ATT&CK-aligned adversary emulation and controlled exercises. MITRE describes ATT&CK evaluations as rigorous, transparent, threat-informed purple-team assessments. urlMITRE ATT&CK Evaluationshttps://www.mitre.org/focus-areas/cybersecurity/mitre-attack
+- AUROC;
+- AUPRC;
+- Brier score;
+- expected calibration error (ECE).
+
+Metrics are explicitly reported as undefined when the corpus lacks the required class diversity rather than fabricating a number.
+
+### Build 21 — Corpus validation
+
+A JSONL fixture proves the schema, provenance fields, and leakage controls. The fixture is synthetic and intentionally not treated as production evidence.
+
+### Build 22 — Threshold calibration
+
+`core/thresholds.py` supports reproducible tuning-set threshold selection using either:
+
+- Youden's J statistic; or
+- constrained recall with a maximum false-positive rate.
+
+The selected threshold is a tuning artifact and must be frozen before final test evaluation.
+
+### Build 23 — Adversarial regression harness
+
+`benchmarks/adversarial.py` applies bounded deterministic jitter, scaling, and noise perturbations to synthetic scenarios. It is intended to catch brittle regressions before independent red/purple-team testing.
+
+## Evaluation layers
+
+### Layer 1 — deterministic regression
+
+Known synthetic scenarios, malformed/short inputs, metric unit tests and schema tests.
+
+### Layer 2 — repeated synthetic evaluation
+
+`benchmarks/benchmark.py` runs 100 deterministic seeds per scenario and reports quality, uncertainty and latency.
+
+### Layer 3 — labeled real traffic
+
+The repository now provides the data contract and validation machinery. Real PCAP/telemetry datasets must be supplied with provenance, labeling authority, confidence, source hashes, collection context, and partition hygiene.
+
+### Layer 4 — threat-informed/purple-team evaluation
+
+Use ATT&CK-aligned adversary emulation and controlled exercises. MITRE publishes adversary-emulation plans specifically to help defenders test products and environments against modeled adversary behavior. urlMITRE adversary emulation planshttps://attack.mitre.org/resources/adversary-emulation-plans/
 
 ## Metrics policy
 
-### Primary metrics
+**Primary:** recall/sensitivity and false-positive rate.
 
-**Recall / sensitivity** is the primary metric for malicious scenario coverage because a missed fade event is a security failure.
+**Supporting:** precision, specificity, F1, balanced accuracy, false-negative rate, AUROC, AUPRC, Brier score, ECE and latency percentiles.
 
-**False-positive rate** is the primary operational guardrail because excessive noise can make a detection product unusable.
+A headline accuracy value must never be presented without support counts and class composition.
 
-**Precision and F1** summarize alert quality but must be interpreted alongside class prevalence.
-
-**Specificity** measures benign-case rejection.
-
-**Balanced accuracy** is preferred over raw accuracy when evaluation corpora are imbalanced.
-
-### Performance metrics
-
-Record at least:
-
-- p50 detection latency;
-- p95 detection latency;
-- p99 detection latency;
-- maximum observed latency;
-- throughput under defined workload;
-- resource utilization in later load-testing builds.
-
-## Confidence intervals
-
-Point estimates alone are insufficient for small corpora. The evaluator uses deterministic percentile bootstrap intervals for classification metrics. The seed and iteration count are recorded so results are reproducible.
-
-Confidence intervals describe uncertainty in the sampled evaluation corpus; they do not compensate for biased or unrepresentative ground truth.
-
-## Scenario-level reporting
-
-Every report must preserve per-scenario results. A strong aggregate result cannot hide a catastrophic failure against one scenario class.
-
-Minimum scenario fields:
-
-```text
-scenario
-support
-true_positive
-false_positive
-true_negative
-false_negative
-precision
-recall
-specificity
-f1
-false_positive_rate
-false_negative_rate
-latency
-```
-
-## Ground-truth contract
-
-A future labeled corpus record should include:
-
-```yaml
-case_id: stable identifier
-scenario: threat behavior category
-expected_detection: true|false
-source: capture/sensor identifier
-collection_start: timestamp
-collection_end: timestamp
-label: analyst/authoritative label
-label_confidence: high|medium|low
-provenance: dataset provenance reference
-adversarial: true|false
-notes: limitations or caveats
-```
-
-## Validation anti-patterns
+## Anti-patterns
 
 Do not:
 
 - report synthetic accuracy as universal detection accuracy;
 - tune thresholds on the final test set;
-- mix duplicate captures across train/tune/test partitions;
+- allow source hashes or duplicate groups across partitions;
 - hide false positives by excluding difficult benign traffic;
 - publish aggregate metrics without sample counts;
 - claim independent validation without an independent evaluator;
-- compare products using incomparable corpora or configurations.
+- compare products using incomparable corpora/configurations;
+- treat bounded synthetic perturbations as evidence of real-world adversarial resilience.
 
 ## Current evidence boundary
 
-The repository currently has deterministic synthetic validation and repeated-seed regression coverage. Real-world labeled corpus validation, adversarial evasion testing, independent purple-team validation, and customer-scale performance validation remain future assurance work.
+Group 2 establishes the **evaluation machinery and regression gates**. It does not claim production detection performance. Real-world labeled-corpus validation, external datasets, adversarial evasion testing, independent purple-team validation, and customer-scale performance validation remain required evidence for enterprise assurance.
