@@ -12,7 +12,7 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
-from sqlalchemy import DateTime, Float, Integer, String, Text, create_engine, select, text
+from sqlalchemy import BigInteger, DateTime, Float, Integer, String, Text, create_engine, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 DATABASE_URL = os.getenv("THREATFADE_DATABASE_URL", "sqlite:///./threatfade.db")
@@ -103,7 +103,7 @@ class TenantConfigRecord(Base):
 class AuditEventRecord(Base):
     __tablename__ = "audit_events"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    sequence_no: Mapped[int] = mapped_column(Integer, nullable=False, unique=True)
+    sequence_no: Mapped[int] = mapped_column(BigInteger, nullable=False, unique=True)
     tenant_id: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
     actor: Mapped[str] = mapped_column(String(255), nullable=False)
     action: Mapped[str] = mapped_column(String(128), nullable=False)
@@ -192,7 +192,6 @@ class LegalHoldRecord(Base):
     released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
-# SQLite developer environments can bootstrap directly; PostgreSQL must use Alembic.
 if DATABASE_URL.startswith("sqlite"):
     Base.metadata.create_all(ENGINE)
 
