@@ -16,6 +16,7 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: lloydcoder/tinlance-threatfade
+  PYTHON_BASE_TAG: 3.12.14-slim-trixie
 
 jobs:
   build-scan:
@@ -31,12 +32,22 @@ jobs:
           persist-credentials: false
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      - name: Resolve current Python base digest
+        id: base
+        shell: bash
+        run: |
+          digest="$(docker buildx imagetools inspect "python:${PYTHON_BASE_TAG}" | awk '/^Digest:/ {print $2; exit}')"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid base digest: $digest"; exit 1; }
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
       - name: Build immutable CI image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           load: true
           tags: threatfade:ci-${{ github.sha }}
+          build-args: |
+            PYTHON_BASE_TAG=${{ env.PYTHON_BASE_TAG }}
+            PYTHON_BASE_DIGEST=${{ steps.base.outputs.digest }}
           provenance: false
           sbom: false
       - name: Generate SPDX SBOM
@@ -103,6 +114,13 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      - name: Resolve current Python base digest
+        id: base
+        shell: bash
+        run: |
+          digest="$(docker buildx imagetools inspect "python:${PYTHON_BASE_TAG}" | awk '/^Digest:/ {print $2; exit}')"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid base digest: $digest"; exit 1; }
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
       - name: Build and publish immutable commit image
         id: push
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
@@ -110,6 +128,9 @@ jobs:
           context: .
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          build-args: |
+            PYTHON_BASE_TAG=${{ env.PYTHON_BASE_TAG }}
+            PYTHON_BASE_DIGEST=${{ steps.base.outputs.digest }}
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
