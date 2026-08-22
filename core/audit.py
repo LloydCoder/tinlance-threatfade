@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import json
+import time
 from typing import Any
 
 from sqlalchemy import select
@@ -16,8 +17,10 @@ def append_event(*, tenant_id: str, actor: str, action: str, object_type: str, o
     now = datetime.now(timezone.utc)
     with Session(ENGINE) as session:
         set_tenant_context(session, tenant_id)
-        previous = session.scalar(select(AuditEventRecord).order_by(AuditEventRecord.sequence_no.desc()).limit(1))
-        sequence = 1 if previous is None else previous.sequence_no + 1
+        previous = session.scalar(select(AuditEventRecord).where(AuditEventRecord.tenant_id == tenant_id).order_by(AuditEventRecord.sequence_no.desc()).limit(1))
+        sequence = time.time_ns()
+        while previous is not None and sequence <= previous.sequence_no:
+            sequence += 1
         prev_hash = GENESIS_HASH if previous is None else previous.event_hash
         created_at = now.isoformat()
         event_hash = audit_event_hash(
