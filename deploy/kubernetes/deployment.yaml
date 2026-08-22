@@ -2,8 +2,16 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: threatfade
+  labels:
+    app: threatfade
 spec:
   replicas: 2
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: threatfade
@@ -12,6 +20,7 @@ spec:
       labels:
         app: threatfade
     spec:
+      terminationGracePeriodSeconds: 30
       securityContext:
         runAsNonRoot: true
         seccompProfile:
@@ -19,8 +28,10 @@ spec:
       containers:
         - name: threatfade
           image: tinlance/threatfade:latest
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8080
+            - name: http
+              containerPort: 8080
           env:
             - name: THREATFADE_ENV
               value: production
@@ -29,18 +40,32 @@ spec:
                 secretKeyRef:
                   name: threatfade-secrets
                   key: api-key
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 24
           readinessProbe:
             httpGet:
               path: /ready
-              port: 8080
-            initialDelaySeconds: 5
-            periodSeconds: 10
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+            successThreshold: 1
           livenessProbe:
             httpGet:
-              path: /health
-              port: 8080
-            initialDelaySeconds: 15
-            periodSeconds: 20
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 5"]
           resources:
             requests:
               cpu: 250m
@@ -53,6 +78,13 @@ spec:
             capabilities:
               drop: ["ALL"]
             readOnlyRootFilesystem: true
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: threatfade
 ---
 apiVersion: v1
 kind: Service
@@ -62,5 +94,16 @@ spec:
   selector:
     app: threatfade
   ports:
-    - port: 80
-      targetPort: 8080
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: threatfade
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: threatfade
