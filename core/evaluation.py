@@ -1,9 +1,8 @@
-"""Evaluation and benchmark metrics for ThreatFade."""
-
+"""Detection evaluation primitives for reproducible ThreatFade validation."""
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Iterable, List, Optional, Sequence
 
 import numpy as np
 
@@ -11,43 +10,53 @@ import numpy as np
 @dataclass(frozen=True)
 class EvaluationCase:
     case_id: str
-    label: str
+    scenario: str
     expected_detection: bool
     detected: bool
-    score: float | None = None
-    latency_ms: float | None = None
-    scenario: str = "default"
+    latency_ms: Optional[float] = None
+    score: Optional[float] = None
 
 
-def _classification_counts(cases: Sequence[EvaluationCase]) -> tuple[int, int, int, int]:
-    tp = sum(case.expected_detection and case.detected for case in cases)
-    tn = sum((not case.expected_detection) and (not case.detected) for case in cases)
-    fp = sum((not case.expected_detection) and case.detected for case in cases)
-    fn = sum(case.expected_detection and (not case.detected) for case in cases)
-    return tp, tn, fp, fn
+@dataclass(frozen=True)
+class ConfusionMatrix:
+    true_positive: int
+    false_positive: int
+    true_negative: int
+    false_negative: int
+
+    @property
+    def total(self) -> int:
+        return self.true_positive + self.false_positive + self.true_negative + self.false_negative
 
 
-def classification_metrics(cases: Sequence[EvaluationCase]) -> dict:
-    """Return deterministic classification metrics."""
-    tp, tn, fp, fn = _classification_counts(cases)
-    total = tp + tn + fp + fn
-    precision = tp / (tp + fp) if tp + fp else 0.0
-    recall = tp / (tp + fn) if tp + fn else 0.0
-    specificity = tn / (tn + fp) if tn + fp else 0.0
-    accuracy = (tp + tn) / total if total else 0.0
-    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
-    return {
-        "support": total,
-        "tp": tp,
-        "tn": tn,
-        "fp": fp,
-        "fn": fn,
-        "precision": precision,
-        "recall": recall,
-        "specificity": specificity,
-        "accuracy": accuracy,
-        "f1": f1,
-    }
+def confusion_matrix(cases: Sequence[EvaluationCase]) -> ConfusionMatrix:
+    tp = fp = tn = fn = 0
+    for case in cases:
+        if case.expected_detection and case.detected:
+            tp += 1
+        elif not case.expected_detection and case.detected:
+            fp += 1
+        elif not case.expected_detection and not case.detected:
+            tn += 1
+        else:
+            fn += 1
+    return ConfusionMatrix(tp, fp, tn, fn)
+
+
+def _safe_div(numerator: float, denominator: float) -> float:
+    return numerator / denominator if denominator else 0.0
+
+
+def classification_metrics(matrix: ConfusionMatrix) -> dict:
+    tp, fp, tn, fn = matrix.true_positive, matrix.false_positive, matrix.true_negative, matrix.false_negative
+    precision = _safe_div(tp, tp + fp)
+    recall = _safe_div(tp, tp + fn)
+    specificity = _safe_div(tn, tn + fp)
+    f1 = _safe_div(2.0 * precision * recall, precision + recall)
+    accuracy = _safe_div(tp + tn, matrix.total)
+    fpr = _safe_div(fp, fp + tn)
+    fnr = _safe_div(fn, fn + tp)
+    return {"support": matrix.total, "positive_support": tp + fn, "negative_support": tn + fp, "true_positive": tp, "false_positive": fp, "true_negative": tn, "false_negative": fn, "accuracy": accuracy, "precision": precision, "recall": recall, "sensitivity": recall, "specificity": specificity, "f1": f1, "false_positive_rate": fpr, "false_negative_rate": fnr, "balanced_accuracy": (recall + specificity) / 2.0}
 
 
 def ranking_metrics(cases: Sequence[EvaluationCase]) -> dict:
@@ -84,67 +93,61 @@ def calibration_metrics(cases: Sequence[EvaluationCase], bins: int = 10) -> dict
     scored = [case for case in cases if case.score is not None and np.isfinite(case.score)]
     if not scored:
         return {"scored_support": 0, "brier_score": None, "ece": None, "bins": bins}
-    scores = np.asarray([float(case.score) for case in scored], dtype=np.float64)
+    scores = np.clip(np.asarray([float(case.score) for case in scored]), 0.0, 1.0)
     labels = np.asarray([int(case.expected_detection) for case in scored], dtype=np.float64)
-    scores = np.clip(scores, 0.0, 1.0)
     brier = float(np.mean((scores - labels) ** 2))
-    edges = np.linspace(0.0, 1.0, bins + 1)
     ece = 0.0
+    edges = np.linspace(0.0, 1.0, bins + 1)
     for index in range(bins):
-        lower = edges[index]
-        upper = edges[index + 1]
-        mask = (scores >= lower) & ((scores < upper) if index < bins - 1 else (scores <= upper))
-        if not np.any(mask):
-            continue
-        ece += float(mask.mean()) * abs(float(scores[mask].mean()) - float(labels[mask].mean()))
-    return {"scored_support": len(scored), "brier_score": brier, "ece": ece, "bins": bins}
+        upper_mask = scores < edges[index + 1] if index < bins - 1 else scores <= edges[index + 1]
+        mask = (scores >= edges[index]) & upper_mask
+        if np.any(mask):
+            ece += float(mask.mean()) * abs(float(scores[mask].mean()) - float(labels[mask].mean()))
+    return {"scored_support": len(scored), "brier_score": brier, "ece": float(ece), "bins": bins}
+
+
+def _metric_from_flags(expected: np.ndarray, detected: np.ndarray, metric: str) -> float:
+    cases = [EvaluationCase(str(i), "bootstrap", bool(expected[i]), bool(detected[i])) for i in range(len(expected))]
+    return float(classification_metrics(confusion_matrix(cases))[metric])
+
+
+def bootstrap_confidence_interval(cases: Sequence[EvaluationCase], metric: str = "f1", confidence: float = 0.95, iterations: int = 2000, seed: int = 20260822) -> dict:
+    if not 0 < confidence < 1:
+        raise ValueError("confidence must be between 0 and 1")
+    if iterations < 100:
+        raise ValueError("iterations must be at least 100")
+    if not cases:
+        return {"metric": metric, "confidence": confidence, "lower": 0.0, "upper": 0.0, "estimate": 0.0, "iterations": 0}
+    if metric not in classification_metrics(confusion_matrix(cases)):
+        raise ValueError(f"unsupported classification metric: {metric}")
+    expected = np.asarray([case.expected_detection for case in cases], dtype=np.bool_)
+    detected = np.asarray([case.detected for case in cases], dtype=np.bool_)
+    rng = np.random.default_rng(seed)
+    estimates = np.empty(iterations, dtype=np.float64)
+    size = len(cases)
+    for i in range(iterations):
+        sample = rng.integers(0, size, size=size)
+        estimates[i] = _metric_from_flags(expected[sample], detected[sample], metric)
+    alpha = (1.0 - confidence) / 2.0
+    point = float(_metric_from_flags(expected, detected, metric))
+    return {"metric": metric, "confidence": confidence, "lower": float(np.quantile(estimates, alpha)), "upper": float(np.quantile(estimates, 1.0 - alpha)), "estimate": point, "iterations": iterations, "seed": seed}
 
 
 def latency_summary(cases: Sequence[EvaluationCase]) -> dict:
-    """Return deterministic latency summary statistics."""
-    values = sorted(float(case.latency_ms) for case in cases if case.latency_ms is not None and np.isfinite(case.latency_ms))
-    if not values:
-        return {"count": 0, "p50_ms": None, "p95_ms": None, "max_ms": None}
-
-    def percentile(percent: float) -> float:
-        if len(values) == 1:
-            return values[0]
-        position = (len(values) - 1) * percent
-        lower = int(np.floor(position))
-        upper = int(np.ceil(position))
-        if lower == upper:
-            return values[lower]
-        fraction = position - lower
-        return values[lower] + (values[upper] - values[lower]) * fraction
-
-    return {
-        "count": len(values),
-        "p50_ms": percentile(0.50),
-        "p95_ms": percentile(0.95),
-        "max_ms": values[-1],
-    }
+    latencies = [float(case.latency_ms) for case in cases if case.latency_ms is not None]
+    if not latencies:
+        return {"count": 0, "mean_ms": None, "p50_ms": None, "p95_ms": None, "p99_ms": None, "max_ms": None}
+    values = np.asarray(latencies, dtype=np.float64)
+    return {"count": int(values.size), "mean_ms": float(values.mean()), "p50_ms": float(np.quantile(values, 0.50)), "p95_ms": float(np.quantile(values, 0.95)), "p99_ms": float(np.quantile(values, 0.99)), "max_ms": float(values.max())}
 
 
-def ranking_metrics_with_bootstrap(cases: Sequence[EvaluationCase], bootstrap: bool = False) -> dict:
-    """Compatibility wrapper used by callers that request bootstrap metadata."""
-    result = ranking_metrics(cases)
-    result["bootstrap"] = bool(bootstrap)
-    return result
-
-
-def evaluate_cases(cases: Sequence[EvaluationCase], bootstrap: bool = False) -> dict:
-    """Build the complete evaluation report."""
-    materialized = list(cases)
-    matrix = classification_metrics(materialized)
-    scenarios: dict[str, dict] = {}
+def evaluate_cases(cases: Iterable[EvaluationCase], bootstrap: bool = True) -> dict:
+    materialized: List[EvaluationCase] = list(cases)
+    matrix = confusion_matrix(materialized)
+    scenarios = {}
     for scenario in sorted({case.scenario for case in materialized}):
-        scenarios[scenario] = classification_metrics([case for case in materialized if case.scenario == scenario])
-    return {
-        "corpus_size": len(materialized),
-        "metrics": matrix,
-        "ranking": ranking_metrics(materialized),
-        "calibration": calibration_metrics(materialized),
-        "latency": latency_summary(materialized),
-        "scenarios": scenarios,
-        "bootstrap": bool(bootstrap),
-    }
+        subset = [case for case in materialized if case.scenario == scenario]
+        scenarios[scenario] = classification_metrics(confusion_matrix(subset))
+    result = {"corpus_size": len(materialized), "metrics": classification_metrics(matrix), "ranking": ranking_metrics(materialized), "calibration": calibration_metrics(materialized), "latency": latency_summary(materialized), "scenarios": scenarios}
+    result["confidence_intervals"] = ({metric: bootstrap_confidence_interval(materialized, metric=metric) for metric in ("precision", "recall", "f1", "false_positive_rate")} if bootstrap and materialized else {})
+    return result
