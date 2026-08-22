@@ -2,9 +2,9 @@
 
 **Program:** Enterprise Hardening  
 **Current release baseline:** v0.4.0  
-**Current group:** Group 2 — Detection Science & Validation  
-**Current build:** Build 23  
-**Status:** GREEN BASELINE — Group 2 implementation complete; external real-world validation remains an assurance requirement
+**Current group:** Group 3 — Detection Pack Platform  
+**Current build:** Build 24  
+**Status:** BUILD 24 IMPLEMENTED — hosted CI verification remains the release gate
 
 ## Group 1 — Security Architecture & Threat Model
 
@@ -25,48 +25,28 @@
 | 22 | Reproducible tuning-set threshold calibration with constrained FPR option | ✅ Complete |
 | 23 | Deterministic adversarial perturbation harness and group CI gate | ✅ Complete |
 
-### Group 2 evidence
+**Group 2 gate:** implementation complete. Synthetic results remain regression evidence only; real-world and independent validation are explicitly deferred to later assurance work.
 
-- `core/evaluation.py`
-- `core/evaluation_corpus.py`
-- `core/thresholds.py`
-- `benchmarks/benchmark.py`
-- `benchmarks/adversarial.py`
-- `datasets/fixtures/ground_truth_v1.jsonl`
-- `scripts/validate_ground_truth.py`
-- `tests/test_evaluation.py`
-- `tests/test_evaluation_corpus.py`
-- `tests/test_thresholds.py`
-- `tests/test_benchmark.py`
-- `docs/DETECTION_EVALUATION.md`
-- `docs/GROUND_TRUTH_DATASET_STANDARD.md`
+## Group 3 — Detection Pack Platform
 
-### Acceptance gate
+| Build | Deliverable | Status |
+|---|---|---|
+| 24 | Immutable detection-pack identity, canonical content hashing and lifecycle promotion primitives | 🟢 Implemented |
+| 25 | Pack manifest/schema hardening and semantic compatibility validation | ⏳ Next |
+| 26 | Pack signing/verification and provenance | ⏳ Planned |
+| 27 | Canary/production registry, rollback and pack regression gate | ⏳ Planned |
 
-- [x] Evaluation separates ground truth from detector output.
-- [x] Confusion-matrix and class-balanced metrics implemented.
-- [x] Scenario-level reporting implemented.
-- [x] Detection latency percentiles implemented.
-- [x] Deterministic bootstrap uncertainty intervals implemented.
-- [x] Ground-truth provenance contract implemented.
-- [x] Source-hash and near-duplicate split leakage controls implemented.
-- [x] AUROC/AUPRC implemented when score/class prerequisites exist.
-- [x] Brier score and ECE implemented for bounded scores.
-- [x] Threshold calibration is explicitly tuning-set based.
-- [x] Adversarial perturbation regression harness implemented.
-- [x] CI executes corpus and adversarial gates.
-- [x] Documentation explicitly prevents synthetic results from being represented as real-world performance claims.
-- [ ] Independent real-world dataset validation — intentionally deferred to external evidence/assurance work.
-- [ ] Independent purple-team validation — intentionally deferred to Group 10.
+### Build 24 evidence
 
-### Verification boundary
+- `core/detection_pack_registry.py`
+- `tests/test_detection_pack_registry.py`
 
-The repository changes are designed to pass the existing Python 3.11/3.12 CI contract and preserve NumPy 1.24 compatibility. The connected GitHub interface available to this session does not expose workflow-run records for the latest commits, so GitHub Actions results cannot be honestly represented as independently observed here. The implementation therefore uses deterministic local-testable gates and does not fabricate a green hosted-CI result.
+The registry currently enforces the lifecycle ordering `research → validated → canary → production → deprecated`, with explicit controlled rollback transitions where permitted. Pack identity includes a canonical SHA-256 content digest so mutation is detectable.
 
-The current synthetic benchmark remains regression evidence only. NIST's measurement guidance emphasizes documented test sets, metrics, uncertainty, representative deployment conditions and repeatable TEVV; MITRE recommends threat-informed behavioral analytics and adversary emulation for meaningful detection validation. urlNIST AI RMF Measurehttps://airc.nist.gov/airmf-resources/airmf/5-sec-core/ urlMITRE ATT&CK detections and analyticshttps://attack.mitre.org/resources/get-started/detections-and-analytics/
+## Verification boundary
 
-## Next group
+The connected GitHub interface available to this session does not expose workflow-run records for the latest commits. Therefore hosted CI cannot be honestly represented as independently observed. The implementation preserves the repository's Python 3.11/3.12 compatibility contract and the existing CI gates; no unsupported green CI claim is made.
 
-**Group 3 — Detection Pack Platform**
+## Next
 
-Planned focus: signed/versioned detection-pack registry, compatibility validation, lifecycle promotion, canarying, rollback, pack provenance and detection-pack regression suites.
+**Build 25 — Detection-pack manifest/schema hardening and semantic compatibility validation.**
