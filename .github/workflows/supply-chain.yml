@@ -36,7 +36,9 @@ jobs:
         id: base
         shell: bash
         run: |
-          digest="$(docker buildx imagetools inspect "python:${PYTHON_BASE_TAG}" | awk '/^Digest:/ {print $2; exit}')"
+          docker pull "python:${PYTHON_BASE_TAG}"
+          ref="$(docker image inspect "python:${PYTHON_BASE_TAG}" --format '{{index .RepoDigests 0}}')"
+          digest="${ref##*@}"
           [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid base digest: $digest"; exit 1; }
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
       - name: Build immutable CI image
@@ -118,7 +120,9 @@ jobs:
         id: base
         shell: bash
         run: |
-          digest="$(docker buildx imagetools inspect "python:${PYTHON_BASE_TAG}" | awk '/^Digest:/ {print $2; exit}')"
+          docker pull "python:${PYTHON_BASE_TAG}"
+          ref="$(docker image inspect "python:${PYTHON_BASE_TAG}" --format '{{index .RepoDigests 0}}')"
+          digest="${ref##*@}"
           [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid base digest: $digest"; exit 1; }
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
       - name: Build and publish immutable commit image
