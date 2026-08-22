@@ -10,46 +10,11 @@ CALIBRATION = (ROOT / "core" / "score_calibration.py").read_text(encoding="utf-8
 FLOW = (ROOT / "core" / "flow_features.py").read_text(encoding="utf-8")
 ML_GOVERNANCE = (ROOT / "core" / "ml_governance.py").read_text(encoding="utf-8")
 
-REQUIRED_ENGINE_MARKERS = (
-    "science_v2",
-    "extract_temporal_features",
-    "extract_beacon_features",
-    "AdaptiveBaseline",
-    "combine_evidence",
-    "science_score",
-    "temporal_features",
-    "baseline_evidence",
-)
-REQUIRED_SCIENCE_MARKERS = (
-    "class TemporalFeatures",
-    "class BeaconFeatures",
-    "class AdaptiveBaseline",
-    "def extract_temporal_features",
-    "def extract_beacon_features",
-    "def behavioral_evidence",
-    "def combine_evidence",
-)
-REQUIRED_CALIBRATION_MARKERS = (
-    "class ScoreCalibrator",
-    "IsotonicRegression",
-    "def freeze",
-    "RuntimeError(\"calibrator is frozen\")",
-)
-REQUIRED_FLOW_MARKERS = (
-    "class PacketObservation",
-    "class ProtocolMetadata",
-    "class FlowFeatures",
-    "def sessionize_observations",
-    "def activity_series",
-    "def infer_protocol_metadata",
-)
-REQUIRED_ML_GOVERNANCE_MARKERS = (
-    "class ModelManifest",
-    "def artifact_sha256",
-    "def manifest_digest",
-    "def population_stability_index",
-    "def drift_state",
-)
+REQUIRED_ENGINE_MARKERS = ("science_v2", "extract_temporal_features", "extract_beacon_features", "AdaptiveBaseline", "combine_evidence", "science_score", "temporal_features", "baseline_evidence")
+REQUIRED_SCIENCE_MARKERS = ("class TemporalFeatures", "class BeaconFeatures", "class AdaptiveBaseline", "def extract_temporal_features", "def extract_beacon_features", "def behavioral_evidence", "def combine_evidence")
+REQUIRED_CALIBRATION_MARKERS = ("class ScoreCalibrator", "IsotonicRegression", "def freeze", "RuntimeError(\"calibrator is frozen\")")
+REQUIRED_FLOW_MARKERS = ("class PacketObservation", "class ProtocolMetadata", "class FlowFeatures", "def sessionize_observations", "def activity_series", "def infer_protocol_metadata")
+REQUIRED_ML_GOVERNANCE_MARKERS = ("class ModelManifest", "def artifact_sha256", "def manifest_digest", "def population_stability_index", "def drift_state")
 
 for marker in REQUIRED_ENGINE_MARKERS:
     assert marker in ENGINE, f"fade engine missing Detection Science marker: {marker}"
@@ -64,7 +29,7 @@ for marker in REQUIRED_ML_GOVERNANCE_MARKERS:
 
 assert '"science_v2": True' in ENGINE
 assert 'or rules_matched >= cfg["rule_threshold"]' in ENGINE
-assert "not a calibrated probability" in SCIENCE
+assert "not a probability" in SCIENCE
 assert 'FEATURE_SCHEMA_VERSION = "threatfade-signal-features-v2"' in ML_GOVERNANCE
 
 print("detection science architecture: OK")
