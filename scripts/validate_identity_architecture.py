@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+"""Deterministic architecture gate for ThreatFade identity and tenancy controls.
+
+This gate complements executable tests. It checks that the production security
+boundary cannot silently regress to API-key-only authentication or permissive
+cross-tenant access during refactors.
+"""
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+ENTERPRISE = (ROOT / "core" / "enterprise.py").read_text(encoding="utf-8")
+
+REQUIRED = {
+    "production OIDC boundary": 'raise HTTPException(401, "Bearer OIDC token required in production")',
+    "RSA algorithm allowlist": "ALLOWED_JWT_ALGORITHMS = {\"RS256\", \"RS384\", \"RS512\"}",
+    "issuer validation": 'issuer=self.issuer',
+    "audience validation": 'audience=self.audience',
+    "required JWT expiry": '"exp", "iat", "sub", "iss", "aud"',
+    "tenant claim": 'claims.get("tenant_id")',
+    "tenant boundary": 'Cross-tenant access denied',
+    "explicit global admin": "principal.is_global_admin",
+    "service identity primitive": "def require_service_principal",
+    "bounded JWKS request": "timeout=(2, 5)",
+    "redirect refusal": "allow_redirects=False",
+    "token lifetime policy": "THREATFADE_OIDC_MAX_TOKEN_LIFETIME_SECONDS",
+}
+
+
+def fail(message: str) -> None:
+    raise SystemExit(f"identity architecture validation failed: {message}")
+
+
+def main() -> None:
+    for name, marker in REQUIRED.items():
+        if marker not in ENTERPRISE:
+            fail(f"missing {name}: {marker}")
+    if 'authorization.startswith("Bearer ")' in ENTERPRISE:
+        fail("legacy case-sensitive Bearer parser remains")
+    if 'requested != principal.tenant_id and "admin" not in principal.roles' in ENTERPRISE:
+        fail("admin role can cross tenant boundaries without explicit global delegation")
+    print(f"identity architecture: OK ({len(REQUIRED)} controls verified)")
+
+
+if __name__ == "__main__":
+    main()
