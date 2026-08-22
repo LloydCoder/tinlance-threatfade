@@ -4,12 +4,13 @@ from core.flow_features import (
     PacketObservation,
     activity_series,
     extract_flow_features,
+    infer_protocol_metadata,
     sessionize_observations,
 )
 
 
-def packet(t, src="10.0.0.1", dst="10.0.0.2", sport=50000, dport=443, size=1000):
-    return PacketObservation(t, src, dst, sport, dport, "TCP", size, size - 100)
+def packet(t, src="10.0.0.1", dst="10.0.0.2", sport=50000, dport=443, size=1000, protocol="TCP"):
+    return PacketObservation(t, src, dst, sport, dport, protocol, size, size - 100)
 
 
 def test_bidirectional_flow_key_is_stable():
@@ -33,6 +34,14 @@ def test_flow_features_are_deterministic():
     assert features.mean_interarrival_seconds == 1.0
     assert features.packets_per_second == 1.5
     assert features.bytes_per_second == 1500.0
+    assert features.application_protocol == "TLS"
+    assert features.encrypted_transport is True
+
+
+def test_quic_metadata_is_encrypted():
+    metadata = infer_protocol_metadata(packet(0, sport=40000, dport=443, protocol="UDP"))
+    assert metadata.application_protocol == "QUIC"
+    assert metadata.encrypted_transport is True
 
 
 def test_activity_series_is_dense_and_normalized():
