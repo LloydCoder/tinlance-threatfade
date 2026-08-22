@@ -1,94 +1,66 @@
 # ThreatFade Enterprise Build Status
 
 **Program:** Enterprise Hardening  
-**Current release baseline:** v0.5.0  
-**Current group:** Group 5 — Reliability, Observability & Resilience  
-**Current build:** Build 37  
+**Current release baseline:** v0.6.0  
+**Current group:** Group 6 — Disaster Recovery, Backup & Operational Continuity  
+**Current build:** Build 41  
 **Status:** IMPLEMENTATION COMPLETE — hosted CI verification is the release gate
 
-## Group 1 — Security Architecture & Threat Model
+## Groups 1–5
+
+Groups 1–5 remain complete and green. See the preceding build records for the detailed build-by-build evidence.
+
+## Group 6 — Disaster Recovery, Backup & Operational Continuity
 
 | Build | Deliverable | Status |
 |---|---|---|
-| 15 | Security architecture, trust boundaries, assets, principals, invariants | ✅ Complete |
-| 16 | Threat model v2, STRIDE analysis, DFD, abuse cases, risk register | ✅ Complete |
-| 17 | ASVS 5.0 baseline matrix, NIST CSF 2.0 mapping, architecture validation gate | ✅ Complete |
+| 38 | Recovery objectives, portable PostgreSQL logical backup artifact and integrity manifest | 🟢 Implemented |
+| 39 | Backup catalog/checksum verification and isolated restore verification primitives | 🟢 Implemented |
+| 40 | Credential-safe PostgreSQL tooling, isolated restore drill and tenant/RLS integrity assertions | 🟢 Implemented |
+| 41 | CI recovery acceptance gate, disaster-recovery architecture validation and operational runbook | 🟢 Implemented |
 
-## Group 2 — Detection Science & Validation
+### Group 6 evidence
 
-| Build | Deliverable | Status |
-|---|---|---|
-| 18 | Repeated-seed evaluation engine, confusion metrics, bootstrap intervals, scenario reporting and latency metrics | ✅ Complete |
-| 19 | Ground-truth corpus schema, provenance and cross-split leakage validation | ✅ Complete |
-| 20 | Score ranking, AUROC/AUPRC, Brier/ECE calibration metrics | ✅ Complete |
-| 21 | Corpus validation CI gate and auditable synthetic ground-truth fixture | ✅ Complete |
-| 22 | Reproducible tuning-set threshold calibration with constrained FPR option | ✅ Complete |
-| 23 | Deterministic adversarial perturbation harness and group CI gate | ✅ Complete |
+- `scripts/backup.py`
+- `scripts/restore_verify.py`
+- `scripts/restore_drill.py`
+- `scripts/validate_disaster_recovery.py`
+- `docs/DISASTER_RECOVERY.md`
+- `.github/workflows/ci.yml`
 
-## Group 3 — Detection Pack Platform
+### Recovery architecture
 
-| Build | Deliverable | Status |
-|---|---|---|
-| 24 | Immutable detection-pack identity, canonical content hashing and lifecycle promotion primitives | ✅ Complete |
-| 25 | Pack manifest/schema hardening and semantic compatibility validation | ✅ Complete |
-| 26 | Pack Ed25519 signing/verification and in-toto/SLSA-shaped provenance | ✅ Complete |
-| 27 | Controlled canary/production lifecycle, rollback and pack regression gate | ✅ Complete |
+ThreatFade separates three recovery mechanisms:
 
-## Group 4 — Data Integrity, Evidence & Audit
+1. **Provider-native PITR/WAL** for the production low-RPO recovery path.
+2. **Portable `pg_dump` custom-format backups** for logical portability, migration and disaster recovery.
+3. **Isolated restore drills** that verify an artifact can actually produce a usable PostgreSQL database.
 
-| Build | Deliverable | Status |
-|---|---|---|
-| 28 | Alembic/PostgreSQL production schema and migration boundary | ✅ Complete |
-| 29 | PostgreSQL row-level tenant isolation and application tenant context | ✅ Complete |
-| 30 | Append-only cryptographically chained audit with export and correlation IDs | ✅ Complete |
-| 31 | Evidence hashing, custody chain and integrity manifests | ✅ Complete |
-| 32 | Detection/input/rule-pack/engine/model/config provenance and investigation timeline | ✅ Complete |
-| 33 | Retention policy/legal hold primitives, regression gates and enterprise integrity verification | ✅ Complete |
+PostgreSQL's current documentation treats SQL dumps, file-system-level backups and continuous archiving as distinct backup approaches. `pg_verifybackup` can detect many base-backup integrity problems, but PostgreSQL explicitly states that verification does not replace test restores. urlPostgreSQL Backup and Restore documentationhttps://www.postgresql.org/docs/current/backup.html urlPostgreSQL pg_verifybackup documentationhttps://www.postgresql.org/docs/current/app-pgverifybackup.html
 
-## Group 5 — Reliability, Observability & Resilience
+### Group 6 acceptance gate
 
-| Build | Deliverable | Status |
-|---|---|---|
-| 34 | Production metrics, low-cardinality request telemetry and OpenTelemetry-compatible spans | 🟢 Implemented |
-| 35 | Dependency-aware liveness/readiness/startup health model and graceful application lifecycle | 🟢 Implemented |
-| 36 | Bounded retry, circuit-breaker and concurrency/bulkhead resilience primitives | 🟢 Implemented |
-| 37 | Kubernetes startup/readiness/liveness hardening, rolling-update safety, topology spreading and PodDisruptionBudget | 🟢 Implemented |
+- [x] RPO target documented: ≤15 minutes for production PostgreSQL.
+- [x] RTO target documented: ≤60 minutes for database recovery.
+- [x] Portable custom-format logical backup implemented.
+- [x] Backup SHA-256 integrity manifest implemented.
+- [x] Backup catalog is verified before acceptance.
+- [x] Credentials are passed through environment state rather than database URLs in process arguments.
+- [x] Restore occurs in an isolated database during CI.
+- [x] Alembic migration head is verified after restore.
+- [x] Required enterprise tables are verified after restore.
+- [x] Forced PostgreSQL RLS is verified after restore.
+- [x] Backup and restore artifacts are never committed to the repository.
+- [x] Disaster-recovery architecture validation is mandatory in CI.
+- [x] PostgreSQL integrity and recovery checks are mandatory in CI.
+- [x] Operational runbook documents backup tiers, restore procedure, recovery targets and failure-domain separation.
 
-### Group 5 evidence
+### Verification boundary
 
-- `core/observability.py`
-- `core/health.py`
-- `core/reliability.py`
-- `core/reliability_routes.py`
-- `enterprise_app.py`
-- `deploy/kubernetes/deployment.yaml`
-- `tests/test_reliability.py`
-- `tests/test_operational_endpoints.py`
-- `scripts/validate_reliability.py`
-
-The production entrypoint now exposes Prometheus-compatible metrics and low-cardinality HTTP telemetry, while retaining optional OpenTelemetry tracing. Readiness performs a real storage dependency check and distinguishes liveness from dependency readiness. FastAPI lifespan state provides lifecycle coordination, and Kubernetes uses startup, liveness and readiness probes with a conservative rolling strategy, topology spread, graceful termination delay and disruption budget. Resilience primitives explicitly bound retries, failure recovery and concurrency rather than allowing unbounded work to accumulate.
-
-### Group 5 acceptance gate
-
-- [x] Request counters, latency histograms and in-flight telemetry exist.
-- [x] Build metadata is exposed through metrics without tenant/user cardinality.
-- [x] Health is dependency-light and suitable for liveness.
-- [x] Readiness fails closed when storage is unavailable or the process is draining.
-- [x] Startup probe is distinct from readiness and liveness.
-- [x] Retry policy uses bounded exponential backoff with jitter and retries only transient classes.
-- [x] Circuit breaker implements closed/open/half-open recovery semantics.
-- [x] Bulkheads reject excess work rather than creating an unbounded queue.
-- [x] Kubernetes rolling deployment guarantees zero voluntary unavailable replicas during rollout.
-- [x] Pod disruption budget protects minimum service capacity.
-- [x] Production container healthcheck uses liveness, not dependency readiness.
-- [x] Python 3.11/3.12 CI, security gates, PostgreSQL integrity and reliability acceptance tests are mandatory.
-
-## Verification boundary
-
-Automated tests and CI demonstrate implementation and regression evidence. They do not constitute independent penetration testing, SOC 2/ISO certification, independent detection validation, contractual SLAs, or customer-scale performance guarantees.
+Automated CI proves that the repository's backup tooling, artifact verification and isolated restore procedure work against the pinned PostgreSQL CI service. It does **not** prove a production provider's PITR configuration, cross-region replication, object-storage durability, KMS configuration, DNS failover or contractual RPO/RTO. Those remain infrastructure responsibilities and must be validated in the deployment environment.
 
 ## Next planned group
 
-**Group 6 — Disaster Recovery, Backup & Operational Continuity.**
+**Group 7 — Supply Chain, Release Governance & Production Deployment Assurance.**
 
-Initial focus: recovery objectives, encrypted/verified backups, migration rollback strategy, restore drills, corruption detection, operational runbooks and CI acceptance of recovery procedures.
+Initial focus: signed release artifacts, provenance verification, dependency/SBOM controls, container/image policy, deployment promotion gates, rollback governance and release-attestation automation.
