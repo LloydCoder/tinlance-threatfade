@@ -27,7 +27,8 @@ def main() -> None:
     action_refs = re.findall(r"uses:\s*([^\s]+)@([^\s]+)", workflow_text)
     unpinned = [f"{name}@{ref}" for name, ref in action_refs if not re.fullmatch(r"[0-9a-f]{40}", ref)]
     assert_true(not unpinned, f"all GitHub Actions must be SHA pinned: {unpinned}")
-    assert_true("docker buildx imagetools inspect python:3.12.14-slim-trixie" in workflow_text, "CI must resolve the current base image digest")
+    assert_true('docker pull "python:${PYTHON_BASE_TAG}"' in workflow_text, "CI must resolve the current base image")
+    assert_true("docker image inspect \"python:${PYTHON_BASE_TAG}\"" in workflow_text, "CI must extract the immutable RepoDigest")
     assert_true("PYTHON_BASE_DIGEST" in workflow_text, "CI must pass the resolved base digest into Docker builds")
 
     manifest = list(yaml.safe_load_all((ROOT / "deploy/kubernetes/deployment.yaml").read_text(encoding="utf-8")))
