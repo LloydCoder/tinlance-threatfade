@@ -28,7 +28,6 @@ def calculate_entropy(values: List[float], window: int = 8) -> np.ndarray:
     values = np.asarray(values, dtype=np.float64)
     if not np.all(np.isfinite(values)):
         raise ValueError("signal values must be finite")
-    n = len(values) - window + 1
     windows = np.lib.stride_tricks.sliding_window_view(values, window)
     abs_vals = np.abs(windows)
     totals = abs_vals.sum(axis=1)
@@ -61,8 +60,7 @@ def detect_zscore_outliers(values: List[float]) -> Tuple[np.ndarray, float]:
 
 def match_rules(values: List[float], entropy_vals: np.ndarray, config: Dict) -> int:
     rules_matched = 0
-    low_entropy_windows = int(np.sum(entropy_vals < 0.3))
-    if low_entropy_windows >= 3:
+    if int(np.sum(entropy_vals < 0.3)) >= 3:
         rules_matched += 1
     drop_ratio = calculate_drop_ratio(values, threshold=0.5)
     if drop_ratio >= 0.55:
@@ -135,13 +133,16 @@ def _science_features(timestamps, values, config):
         if timestamps is not None and len(timestamps) >= 2:
             beacon = extract_beacon_features(timestamps)
     except (TypeError, ValueError):
-        # A malformed timestamp stream must not disable the signal detector.
         beacon = None
 
+    # Initialize the EWMA state from an edge window in O(n) NumPy time rather
+    # than calling the Python update loop once per packet in large captures.
     baseline = AdaptiveBaseline(min_support=max(4, min(8, len(values) // 2)))
     edge = max(1, int(round(len(values) * 0.2)))
-    for value in values[:edge]:
-        baseline.update(float(value))
+    baseline_values = np.asarray(values[:edge], dtype=np.float64)
+    baseline.mean = float(np.mean(baseline_values))
+    baseline.variance = float(np.var(baseline_values))
+    baseline.support = int(edge)
     baseline_evidence = baseline.evidence(float(np.mean(values[-edge:])))
     behavior = behavioral_evidence(temporal, beacon)
     return temporal, beacon, baseline_evidence, behavior
@@ -185,18 +186,13 @@ def detect_fade(timestamps, values, config=None):
         weight = float(np.clip(cfg.get("science_weight", 0.35), 0.0, 1.0))
         combined_score = (1.0 - weight) * legacy_score + weight * science_score
 
-    # Preserve the existing deterministic rule escape hatch. Science 2.0 adds
-    # evidence; it never silently removes an explicit legacy rule match.
     detected = bool(combined_score >= cfg["threshold"] or rules_matched >= cfg["rule_threshold"])
     if detected:
-        if temporal.change_point_index >= 0:
-            fade_start = temporal.change_point_index
-        else:
-            fade_start = find_fade_start(entropy_vals, values)
+        fade_start = temporal.change_point_index if temporal.change_point_index >= 0 else find_fade_start(entropy_vals, values)
     else:
         fade_start = -1
     confidence = compute_confidence(combined_score, rules_matched, max_zscore, drop_ratio)
-    result = {
+    return {
         "detected": detected,
         "score": float(combined_score),
         "confidence": confidence,
@@ -215,7 +211,6 @@ def detect_fade(timestamps, values, config=None):
         "baseline_evidence": baseline_evidence.to_dict(),
         "beacon_features": beacon.to_dict() if beacon else {},
     }
-    return result
 
 
 def detect_fade_with_ml(timestamps, values, config=None, ml_detector=None):
@@ -235,9 +230,6 @@ def detect_fade_with_ml(timestamps, values, config=None, ml_detector=None):
     result["ml_score"] = float(ml_score)
     result["ml_anomaly"] = bool(ml_anomaly)
     result["ml_available"] = bool(ml_available)
-
-    # ML contributes bounded supporting evidence only; deterministic evidence
-    # remains the primary detection path.
     if ml_available:
         base = float(result["science_score"])
         result["science_score_with_ml"] = float(min(1.0, 0.96 * base + 0.04 * np.clip(ml_score, 0.0, 1.0)))
