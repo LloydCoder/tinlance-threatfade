@@ -1,12 +1,19 @@
-import os
+import json
+import time
 
-import pytest
-from fastapi import HTTPException
-from fastapi.testclient import TestClient
-from cryptography.hazmat.primitives.asymmetric import rsa
 import jwt
+import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
+from fastapi import HTTPException
 
-from core.enterprise import ALLOWED_JWT_ALGORITHMS, OIDCValidator, Principal, authenticate, authorize, require_tenant
+from core.enterprise import (
+    ALLOWED_JWT_ALGORITHMS,
+    OIDCValidator,
+    Principal,
+    authenticate,
+    authorize,
+    require_tenant,
+)
 
 
 def _request(headers=None):
@@ -19,6 +26,28 @@ def _request(headers=None):
             self.client = Client()
 
     return Request()
+
+
+def _validator(private_key, *, roles=None, tenant="tenant-a"):
+    validator = OIDCValidator()
+    validator.issuer = "https://issuer.example"
+    validator.audience = "threatfade"
+    validator.jwks_url = "https://issuer.example/keys"
+    public = json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(private_key.public_key()))
+    validator._jwks = {"keys": [{**public, "kid": "k1", "alg": "RS256", "use": "sig"}]}
+    validator._jwks_at = time.monotonic()
+    claims = {
+        "iss": validator.issuer,
+        "aud": validator.audience,
+        "sub": "user-1",
+        "tenant_id": tenant,
+        "iat": int(time.time()),
+        "exp": int(time.time()) + 300,
+    }
+    if roles is not None:
+        claims["roles"] = roles
+    token = jwt.encode(claims, private_key, algorithm="RS256", headers={"kid": "k1"})
+    return validator, token
 
 
 def test_role_permissions_are_explicit_and_tenant_scoped():
@@ -61,7 +90,7 @@ def test_production_never_accepts_development_auth(monkeypatch):
     assert exc.value.status_code == 401
 
 
-def test_api_key_is_not_an_production_authentication_path(monkeypatch):
+def test_api_key_is_not_a_production_authentication_path(monkeypatch):
     monkeypatch.setenv("THREATFADE_ENV", "production")
     monkeypatch.setenv("THREATFADE_API_KEY", "secret")
     with pytest.raises(HTTPException) as exc:
@@ -82,29 +111,9 @@ def test_jwt_algorithm_allowlist_is_asymmetric_only():
     assert "none" not in ALLOWED_JWT_ALGORITHMS
 
 
-def test_oidc_validator_rejects_invalid_role_claim(monkeypatch):
+def test_oidc_validator_rejects_invalid_role_claim():
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    public_jwk = jwt.algorithms.RSAAlgorithm.to_jwk(private_key.public_key())
-    validator = OIDCValidator()
-    validator.issuer = "https://issuer.example"
-    validator.audience = "threatfade"
-    validator.jwks_url = "https://issuer.example/keys"
-    validator._jwks = {"keys": [{**__import__("json").loads(public_jwk), "kid": "k1", "alg": "RS256", "use": "sig"}]}
-    validator._jwks_at = __import__("time").monotonic()
-    token = jwt.encode(
-        {
-            "iss": validator.issuer,
-            "aud": validator.audience,
-            "sub": "user-1",
-            "tenant_id": "tenant-a",
-            "roles": "admin",
-            "iat": __import__("time").time(),
-            "exp": __import__("time").time() + 300,
-        },
-        private_key,
-        algorithm="RS256",
-        headers={"kid": "k1"},
-    )
+    validator, token = _validator(private_key, roles="admin")
     with pytest.raises(HTTPException) as exc:
         validator.validate(token)
     assert exc.value.status_code == 403
@@ -112,16 +121,9 @@ def test_oidc_validator_rejects_invalid_role_claim(monkeypatch):
 
 def test_oidc_validator_accepts_namespaced_roles_and_tenant():
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    import json
-    import time
-
+    validator, _ = _validator(private_key)
     public = json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(private_key.public_key()))
-    validator = OIDCValidator()
-    validator.issuer = "https://issuer.example"
-    validator.audience = "threatfade"
-    validator.jwks_url = "https://issuer.example/keys"
     validator._jwks = {"keys": [{**public, "kid": "k1", "alg": "RS256", "use": "sig"}]}
-    validator._jwks_at = time.monotonic()
     token = jwt.encode(
         {
             "iss": validator.issuer,
@@ -146,22 +148,43 @@ def test_oidc_validator_accepts_namespaced_roles_and_tenant():
 
 def test_oidc_validator_rejects_unknown_key(monkeypatch):
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    import json
-    import time
+    validator, _ = _validator(private_key)
+    unknown_keys = validator._jwks
+    monkeypatch.setattr(validator, "_load_jwks", lambda: unknown_keys)
+    token = jwt.encode(
+        {
+            "iss": validator.issuer,
+            "aud": validator.audience,
+            "sub": "u",
+            "tenant_id": "t",
+            "iat": int(time.time()),
+            "exp": int(time.time()) + 60,
+        },
+        private_key,
+        algorithm="RS256",
+        headers={"kid": "missing"},
+    )
+    with pytest.raises(HTTPException) as exc:
+        validator.validate(token)
+    assert exc.value.status_code == 401
 
-    public = json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(private_key.public_key()))
+
+def test_oidc_validator_rejects_hs256_token():
     validator = OIDCValidator()
     validator.issuer = "https://issuer.example"
     validator.audience = "threatfade"
     validator.jwks_url = "https://issuer.example/keys"
-    validator._jwks = {"keys": [{**public, "kid": "different", "alg": "RS256", "use": "sig"}]}
-    validator._jwks_at = time.monotonic()
-    monkeypatch.setattr(validator, "_load_jwks", lambda: validator._jwks)
     token = jwt.encode(
-        {"iss": validator.issuer, "aud": validator.audience, "sub": "u", "tenant_id": "t", "iat": int(time.time()), "exp": int(time.time()) + 60},
-        private_key,
-        algorithm="RS256",
-        headers={"kid": "missing"},
+        {
+            "iss": validator.issuer,
+            "aud": validator.audience,
+            "sub": "u",
+            "tenant_id": "t",
+            "iat": int(time.time()),
+            "exp": int(time.time()) + 60,
+        },
+        "shared-secret",
+        algorithm="HS256",
     )
     with pytest.raises(HTTPException) as exc:
         validator.validate(token)
