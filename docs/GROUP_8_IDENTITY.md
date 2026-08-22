@@ -62,6 +62,8 @@ No current production endpoint requires a machine-only principal. The Group 8 bo
 - unknown signing keys
 - HS256 rejection
 
+`test_enterprise.py` also enforces that the `admin` role alone cannot cross tenant boundaries; cross-tenant administration requires the explicit `global_admin=true` claim.
+
 `scripts/validate_identity_architecture.py` provides a deterministic CI architecture gate against accidental removal of the production OIDC boundary, tenant isolation rule, RSA algorithm allow-list, issuer/audience verification and bounded JWKS retrieval.
 
 ## Verification boundary
