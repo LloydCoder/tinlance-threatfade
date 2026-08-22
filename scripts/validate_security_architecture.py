@@ -49,6 +49,40 @@ def fail(message: str) -> None:
     raise SystemExit(f"security architecture validation failed: {message}")
 
 
+def find_unsupported_assurance_claims(text: str) -> list[str]:
+    """Return lines containing affirmative unsupported certification claims.
+
+    Security documentation must reject actual claims of certification while
+    allowing explicit assurance-boundary language such as "not a claim of
+    ASVS certification". The previous substring check treated that required
+    disclaimer as a violation, causing CI to fail deterministically.
+    """
+    forbidden_phrases = (
+        "asvs certified",
+        "asvs certification",
+        "soc 2 certified",
+        "iso 27001 certified",
+    )
+    disclaimer_markers = (
+        "not a certification claim",
+        "not a claim of asvs certification",
+        "does not represent soc 2",
+        "does not represent iso 27001",
+        "does not claim",
+        "without certification",
+    )
+
+    findings: list[str] = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip().lower()
+        if not line or not any(phrase in line for phrase in forbidden_phrases):
+            continue
+        if any(marker in line for marker in disclaimer_markers):
+            continue
+        findings.append(raw_line.strip())
+    return findings
+
+
 def main() -> None:
     contents = {}
     for name, path in REQUIRED_FILES.items():
@@ -77,16 +111,13 @@ def main() -> None:
         if token not in architecture:
             fail(f"security architecture missing required marker {token}")
 
-    combined = "\n".join(contents.values()).lower()
-    forbidden_claims = (
-        "asvs certified",
-        "asvs certification",
-        "soc 2 certified",
-        "iso 27001 certified",
-    )
-    for phrase in forbidden_claims:
-        if phrase in combined:
-            fail(f"documentation must not make unsupported assurance claim: {phrase}")
+    for name, text in contents.items():
+        findings = find_unsupported_assurance_claims(text)
+        if findings:
+            fail(
+                "documentation must not make unsupported assurance claim "
+                f"in {name}: {findings[0]}"
+            )
 
     print("security architecture: OK")
     print("threat model: OK")
