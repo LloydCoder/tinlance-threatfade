@@ -6,6 +6,7 @@ from time import perf_counter
 import os
 
 from fastapi import Request
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from api import app
@@ -29,6 +30,13 @@ app.router.lifespan_context = lifespan
 class ReliabilityMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         started = perf_counter()
+        if request.url.path == "/ready":
+            draining = bool(getattr(app.state, "draining", False))
+            ready, checks = readiness_state(draining=draining)
+            payload = {"status": "ready" if ready else "not_ready", "checks": checks, "version": app.version}
+            response = JSONResponse(status_code=200 if ready else 503, content=payload)
+            observe_http(request.method, "/ready", response.status_code, perf_counter() - started)
+            return response
         try:
             response = await call_next(request)
         except Exception:
@@ -48,18 +56,3 @@ app.include_router(reliability_router)
 _metrics = metrics_app()
 if _metrics is not None:
     app.mount("/metrics", _metrics)
-
-
-@app.get("/health")
-def production_health():
-    return {"status": "ok", "version": app.version, "environment": os.getenv("THREATFADE_ENV", "development").lower()}
-
-
-@app.get("/ready")
-def production_readiness():
-    draining = bool(getattr(app.state, "draining", False))
-    ready, checks = readiness_state(draining=draining)
-    if not ready:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=503, detail={"status": "not_ready", "checks": checks})
-    return {"status": "ready", "checks": checks, "version": app.version}
