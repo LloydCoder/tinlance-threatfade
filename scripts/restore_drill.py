@@ -24,20 +24,21 @@ def restore_and_verify(archive: Path, target_url: str, expected_revision: str) -
     if not archive.is_file() or archive.stat().st_size == 0:
         raise ValueError("backup archive is missing or empty")
     args, env = _pg_args(target_url)
-    subprocess.run(["pg_restore", "--exit-on-error", "--no-owner", "--no-privileges", "--dbname", target_url, str(archive)], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    subprocess.run(["pg_restore", "--exit-on-error", "--no-owner", "--no-privileges", *args, str(archive)], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
     engine = create_engine(target_url)
+    required = {"detections", "cases", "audit_events", "evidence", "provenance", "investigation_timeline"}
     with engine.connect() as conn:
         revision = conn.execute(text("SELECT version_num FROM alembic_version LIMIT 1")).scalar_one()
         if revision != expected_revision:
             raise RuntimeError(f"restored migration head {revision!r} != expected {expected_revision!r}")
         tables = set(inspect(conn).get_table_names())
-        required = {"alembic_version", "detections", "cases", "audit_events", "evidence", "provenance", "investigation_timeline"}
         missing = sorted(required - tables)
         if missing:
             raise RuntimeError(f"restored database missing required tables: {missing}")
-        rls = dict(conn.execute(text("SELECT c.relname, c.relrowsecurity AND c.relforcerowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname = ANY(:tables)"), {"tables": list(required - {"alembic_version"})}).all())
-        if len(rls) != len(required - {"alembic_version"}) or not all(rls.values()):
-            raise RuntimeError("restored tenant tables do not all have forced RLS enabled")
+        rls_rows = conn.execute(text("SELECT relname, relrowsecurity, relforcerowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND relname = ANY(:tables)"), {"tables": list(required)}).all()
+        rls = {row[0]: bool(row[1] and row[2]) for row in rls_rows}
+        if set(rls) != required or not all(rls.values()):
+            raise RuntimeError(f"restored tenant tables do not all have forced RLS enabled: {rls}")
     return {"status": "ok", "migration_head": revision, "tables": len(tables), "rls_tables": len(rls)}
 
 
