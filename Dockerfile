@@ -13,10 +13,11 @@ LABEL org.opencontainers.image.source="https://github.com/LloydCoder/tinlance-th
       org.opencontainers.image.description="Open-core network threat detection oracle" \
       org.opencontainers.image.licenses="Apache-2.0"
 
-RUN apt-get update \
-    && apt-get dist-upgrade -y \
-    && rm -rf /var/lib/apt/lists/*
-
+# The official Python base is already built from the current Debian security
+# repositories. Avoid a standalone apt-get update layer: Trivy DS-0017 flags
+# update-only patterns because stale package indexes can create non-reproducible
+# and vulnerable image layers. Dependency installation is handled below with
+# pip from the pinned application requirements.
 RUN addgroup --system threatfade && adduser --system --ingroup threatfade threatfade
 WORKDIR /app
 
