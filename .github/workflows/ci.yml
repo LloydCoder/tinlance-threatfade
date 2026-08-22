@@ -101,6 +101,8 @@ jobs:
           pip install -r requirements.txt
       - name: Apply production migration
         run: alembic upgrade head
+      - name: Resolve current migration head
+        run: echo "THREATFADE_MIGRATION_HEAD=$(alembic current | sed -n 's/.*(head),.*/\1/p' | tr -d ' ')" >> "$GITHUB_ENV"
       - name: Create least-privileged application role
         run: |
           python - <<'PY'
@@ -120,8 +122,6 @@ jobs:
           THREATFADE_DATABASE_URL: ${{ env.THREATFADE_APP_DATABASE_URL }}
         run: python scripts/validate_postgres_integrity.py
       - name: Create logical recovery artifact
-        env:
-          THREATFADE_MIGRATION_HEAD: 20260822_0001
         run: python scripts/backup.py ./recovery-artifact
       - name: Verify recovery artifact checksum and catalog
         shell: bash
@@ -136,7 +136,7 @@ jobs:
           PGPASSWORD=threatfade psql -h localhost -U threatfade -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS threatfade_restore WITH (FORCE);'
           PGPASSWORD=threatfade psql -h localhost -U threatfade -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE threatfade_restore;'
       - name: Restore and verify isolated database
-        run: python scripts/restore_drill.py "$RECOVERY_ARCHIVE" --target-url "$THREATFADE_RESTORE_DATABASE_URL" --expected-revision 20260822_0001
+        run: python scripts/restore_drill.py "$RECOVERY_ARCHIVE" --target-url "$THREATFADE_RESTORE_DATABASE_URL" --expected-revision "$THREATFADE_MIGRATION_HEAD"
       - name: Cleanup restore database
         if: always()
         run: PGPASSWORD=threatfade psql -h localhost -U threatfade -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS threatfade_restore WITH (FORCE);'
