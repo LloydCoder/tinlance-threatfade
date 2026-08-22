@@ -28,44 +28,35 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
       - name: Compile Python sources
         run: python -m compileall -q .
-
       - name: Validate security architecture baseline
         run: python scripts/validate_security_architecture.py
-
       - name: Validate ground-truth corpus contract
         run: python scripts/validate_ground_truth.py
-
+      - name: Validate reliability architecture
+        run: python scripts/validate_reliability.py
       - name: Run complete test suite
         run: pytest -q
-
       - name: Run reproducible benchmark
         run: python benchmarks/benchmark.py
-
       - name: Run adversarial synthetic benchmark
         run: python benchmarks/adversarial.py
-
       - name: Validate detection pack
         run: |
           python -c "from core.detection_pack import detection_pack, validate_pack; validate_pack(detection_pack()); print('detection pack: OK')"
           python -c "from tests.test_detection_pack_platform import manifest; from core.detection_pack_platform import validate_manifest; validate_manifest(manifest()); print('pack manifest: OK')"
-
       - name: Enterprise and dashboard smoke checks
         run: python scripts/enterprise_smoke.py
-
       - name: Build production container
         run: docker build --pull -t threatfade:ci .
 
