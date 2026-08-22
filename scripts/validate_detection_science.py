@@ -29,7 +29,7 @@ for marker in REQUIRED_ML_GOVERNANCE_MARKERS:
 
 assert '"science_v2": True' in ENGINE
 assert 'or rules_matched >= cfg["rule_threshold"]' in ENGINE
-assert "not a probability" in SCIENCE
+assert "not a calibrated probability" in CALIBRATION
 assert 'FEATURE_SCHEMA_VERSION = "threatfade-signal-features-v2"' in ML_GOVERNANCE
 
 print("detection science architecture: OK")
