@@ -6,7 +6,6 @@ from hashlib import sha256
 import json
 from typing import Mapping
 
-
 LIFECYCLE = ("research", "validated", "canary", "production", "deprecated")
 TRANSITIONS = {
     "research": {"validated"},
@@ -47,6 +46,19 @@ def transition(identity: PackIdentity, target: str) -> PackIdentity:
     if target not in TRANSITIONS[identity.lifecycle]:
         raise ValueError(f"invalid lifecycle transition: {identity.lifecycle} -> {target}")
     return PackIdentity(identity.pack_id, identity.version, target, identity.content_sha256)
+
+
+def rollback(identity: PackIdentity, previous: PackIdentity) -> PackIdentity:
+    """Return a canary/production deployment to a previously validated pack."""
+    if identity.pack_id != previous.pack_id:
+        raise ValueError("rollback requires matching pack_id")
+    if identity.content_sha256 == previous.content_sha256:
+        raise ValueError("rollback target must be a different immutable content digest")
+    if identity.lifecycle not in {"canary", "production"}:
+        raise ValueError("rollback is only permitted from canary or production")
+    if previous.lifecycle not in {"validated", "canary", "production"}:
+        raise ValueError("rollback target must be a validated deployment state")
+    return PackIdentity(previous.pack_id, previous.version, "production", previous.content_sha256)
 
 
 def verify_identity(pack: Mapping[str, object], identity: PackIdentity) -> bool:
