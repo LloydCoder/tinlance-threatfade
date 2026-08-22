@@ -27,6 +27,8 @@ jobs:
           pip install -r requirements.txt
       - name: Compile Python sources
         run: python -m compileall -q .
+      - name: Validate security architecture baseline
+        run: python scripts/validate_security_architecture.py
       - name: Run complete test suite
         run: pytest -q
       - name: Run reproducible benchmark
