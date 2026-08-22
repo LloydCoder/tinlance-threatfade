@@ -9,7 +9,8 @@ ThreatFade's engineering controls are aligned to OWASP ASVS 5.0, NIST CSF 2.0, s
 ## Production controls
 
 - TLS terminates at the deployment edge; plain HTTP is not exposed publicly.
-- API authentication is mandatory in production (`THREATFADE_API_KEY` or an upstream OIDC gateway).
+- Protected application operations require OIDC bearer authentication in production; API-key and local-development authentication are not production fallbacks.
+- JWT validation enforces issuer, audience, expiry, issued-at, required claims, an RSA-only algorithm allowlist, bounded JWKS retrieval, and key-rotation retry.
 - CORS is allow-list based; wildcard origins are development-only.
 - PCAP uploads have explicit byte limits and extension/content validation.
 - Rate limiting is enabled and should be enforced at both edge and application layers.
@@ -23,11 +24,13 @@ ThreatFade's engineering controls are aligned to OWASP ASVS 5.0, NIST CSF 2.0, s
 
 ## Identity and tenancy
 
-The application security boundary is deliberately separated from the deployment identity provider. Enterprise deployments should place OIDC/SSO in front of the API or use the documented gateway contract. Tenant identity must be derived from an authenticated identity claim, never from an arbitrary client-controlled tenant header.
+The application security boundary is deliberately separated from the deployment identity provider. Enterprise deployments use an external OIDC provider such as Keycloak, Entra ID, Okta, Auth0, or an equivalent compliant provider.
 
-The public repository does not ship a hosted identity provider. Keycloak, Entra ID, Okta, Auth0, or an equivalent OIDC provider can be used at deployment time.
+The authenticated token is the authoritative source of tenant identity. `X-Tenant-ID` is only a consistency assertion and cannot substitute for the token tenant. Cross-tenant access is denied unless the authenticated principal carries an explicit `global_admin=true` delegation claim. The ordinary `admin` role is tenant-scoped.
 
-Recommended roles: `viewer`, `analyst`, `admin`, `tenant_admin`, `api_only`.
+Supported roles: `viewer`, `analyst`, `admin`, `tenant_admin`, `api_only`.
+
+The service-identity boundary is reserved for short-lived OIDC service tokens using the least-privilege `api_only` role; individual service endpoints must explicitly require that principal class when introduced.
 
 ## Data protection
 
