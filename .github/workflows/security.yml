@@ -55,12 +55,13 @@ jobs:
           persist-credentials: false
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4.37.1
+        uses: github/codeql-action/init@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
         with:
           languages: python
+          queries: security-extended
 
       - name: Analyze with CodeQL
-        uses: github/codeql-action/analyze@v4.37.1
+        uses: github/codeql-action/analyze@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
 
   secret-scan:
     runs-on: ubuntu-latest
@@ -75,7 +76,7 @@ jobs:
           persist-credentials: false
 
       - name: Secret scan
-        uses: gitleaks/gitleaks-action@v3.0.0
+        uses: gitleaks/gitleaks-action@e0c47f4f1f4b5e7e0c0a5d5d0a1b1b1d0e6c9b0e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_COMMENTS: 'false'
