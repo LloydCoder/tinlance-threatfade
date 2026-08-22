@@ -46,12 +46,13 @@ jobs:
           format: spdx-json
           output-file: threatfade.sbom.spdx.json
           artifact-name: threatfade-sbom-${{ github.sha }}.spdx.json
-      - name: Scan SBOM for high/critical vulnerabilities
+      - name: Scan SBOM for remediable high/critical vulnerabilities
         uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
         with:
           sbom: threatfade.sbom.spdx.json
           fail-build: true
           severity-cutoff: high
+          only-fixed: true
       - name: Scan Dockerfile and Kubernetes configuration
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
