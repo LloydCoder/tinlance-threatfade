@@ -102,7 +102,9 @@ jobs:
       - name: Apply production migration
         run: alembic upgrade head
       - name: Resolve current migration head
-        run: echo "THREATFADE_MIGRATION_HEAD=$(alembic current | sed -n 's/.*(head),.*/\1/p' | tr -d ' ')" >> "$GITHUB_ENV"
+        run: echo "THREATFADE_MIGRATION_HEAD=$(alembic current | awk '/\(head\)/ {print $1; exit}')" >> "$GITHUB_ENV"
+      - name: Assert migration head resolved
+        run: test -n "$THREATFADE_MIGRATION_HEAD"
       - name: Create least-privileged application role
         run: |
           python - <<'PY'
