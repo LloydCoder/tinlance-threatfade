@@ -29,10 +29,14 @@ jobs:
         run: python -m compileall -q .
       - name: Validate security architecture baseline
         run: python scripts/validate_security_architecture.py
+      - name: Validate ground-truth corpus contract
+        run: python scripts/validate_ground_truth.py
       - name: Run complete test suite
         run: pytest -q
       - name: Run reproducible benchmark
         run: python benchmarks/benchmark.py
+      - name: Run adversarial synthetic benchmark
+        run: python benchmarks/adversarial.py
       - name: Validate detection pack
         run: |
           python -c "from core.detection_pack import detection_pack, validate_pack; validate_pack(detection_pack()); print('detection pack: OK')"
