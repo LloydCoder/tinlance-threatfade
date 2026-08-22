@@ -1,10 +1,10 @@
 # ThreatFade Enterprise Build Status
 
 **Program:** Enterprise Hardening  
-**Current release baseline:** v0.6.0  
-**Current group:** Group 6 — Disaster Recovery, Backup & Operational Continuity  
-**Current build:** Build 41  
-**Status:** IMPLEMENTATION COMPLETE — hosted CI verification is the release gate
+**Current release baseline:** v0.7.0  
+**Current group:** Group 7 — Secure Deployment, Supply Chain & Production Operations  
+**Current build:** Build 46  
+**Status:** IMPLEMENTATION COMPLETE — hosted CI/security verification is the release gate
 
 ## Completed groups
 
@@ -13,38 +13,54 @@
 - Group 3 — Detection Pack Platform: ✅ Builds 24–27
 - Group 4 — Data Integrity, Evidence & Audit: ✅ Builds 28–33
 - Group 5 — Reliability, Observability & Resilience: ✅ Builds 34–37
+- Group 6 — Disaster Recovery, Backup & Operational Continuity: ✅ Builds 38–41
 
-## Group 6 — Disaster Recovery, Backup & Operational Continuity
+## Group 7 — Secure Deployment, Supply Chain & Production Operations
 
 | Build | Deliverable | Status |
 |---|---|---|
-| 38 | Portable PostgreSQL custom-format backup generation with credential-safe libpq environment handling and SHA-256 manifest | 🟢 Implemented |
-| 39 | Backup catalog/checksum verification and isolated restore drill | 🟢 Implemented |
-| 40 | Recovery architecture acceptance gate and mandatory CI integration | 🟢 Implemented |
-| 41 | RPO/RTO, PITR/WAL, backup-tier and operational recovery runbook | 🟢 Implemented |
+| 42 | Docker build-context isolation, supply-chain validator, Trivy policy baseline | 🟢 Implemented |
+| 43 | Digest-pinned base image, hardened Kubernetes workload identity/filesystem/network posture | 🟢 Implemented |
+| 44 | SHA-pinned security actions, SPDX SBOM and vulnerability gates | 🟢 Implemented |
+| 45 | GHCR release publication, SLSA provenance and SBOM attestations | 🟢 Implemented |
+| 46 | Production digest renderer, CI enforcement and secure deployment documentation | 🟢 Implemented |
 
-### Group 6 evidence
+### Group 7 evidence
 
-- `scripts/backup.py`
-- `scripts/restore_verify.py`
-- `scripts/restore_drill.py`
-- `scripts/validate_disaster_recovery.py`
-- `docs/DISASTER_RECOVERY.md`
+- `Dockerfile`
+- `.dockerignore`
+- `trivy.yaml`
+- `scripts/validate_supply_chain.py`
+- `scripts/render_production_manifest.py`
 - `.github/workflows/ci.yml`
+- `.github/workflows/security.yml`
+- `.github/workflows/supply-chain.yml`
+- `deploy/kubernetes/deployment.yaml`
+- `deploy/kubernetes/production/deployment.template.yaml`
+- `docs/SECURE_DEPLOYMENT.md`
 
-### Group 6 acceptance gate
+### Group 7 acceptance gate
 
-- [x] PostgreSQL custom-format logical backup is generated without placing the database password in the command arguments.
-- [x] Backup SHA-256 is recorded in a manifest.
-- [x] `pg_restore --list` verifies the archive has restoreable catalog entries.
-- [x] Restore is performed only into an isolated database during CI drills.
-- [x] Alembic migration revision is resolved dynamically rather than hard-coded.
-- [x] Required enterprise tables are verified after restore.
-- [x] Forced PostgreSQL RLS is verified after restore.
-- [x] Recovery artifacts remain ephemeral and are not committed to Git.
-- [x] Production low-RPO recovery is explicitly separated from logical-dump portability and uses provider-native PITR/WAL as the deployment responsibility.
-- [x] RPO/RTO targets and restore acceptance criteria are documented.
-- [x] Python 3.11/3.12 CI, security gates, PostgreSQL integrity, backup verification and isolated restore are mandatory release checks.
+- [x] Docker base image is content-digest pinned.
+- [x] Container runs as non-root with dropped capabilities and no privilege escalation.
+- [x] OCI source metadata is embedded in the image.
+- [x] Build context excludes Git metadata, local environments, recovery artifacts and temporary files.
+- [x] All GitHub Actions are referenced by immutable commit SHA.
+- [x] CodeQL runs security-extended analysis.
+- [x] Gitleaks runs the current Node 24-compatible action release.
+- [x] SPDX SBOM is generated for the container.
+- [x] SBOM is scanned for high/critical vulnerabilities.
+- [x] Dockerfile/Kubernetes configuration is scanned by Trivy.
+- [x] Main-branch release image is published under a commit-derived tag.
+- [x] Main-branch image receives OIDC-backed SLSA provenance attestation.
+- [x] Main-branch image receives an SPDX SBOM attestation.
+- [x] Kubernetes service-account token automount is disabled.
+- [x] Kubernetes uses non-root, RuntimeDefault seccomp, read-only root filesystem and dropped capabilities.
+- [x] Writable application paths are isolated to `emptyDir` volumes.
+- [x] NetworkPolicy restricts workload traffic.
+- [x] Production rendering refuses mutable image references and requires `@sha256:<64-hex>`.
+- [x] Supply-chain validator is mandatory in core CI.
+- [x] Pull requests do not receive package-write or attestation privileges.
 
 ## Verification boundary
 
@@ -52,6 +68,6 @@ Automated tests and CI demonstrate implementation and regression evidence. They 
 
 ## Next planned group
 
-**Group 7 — Secure Deployment, Supply Chain & Production Operations.**
+**Group 8 — Identity, Access Control & Enterprise Multi-Tenancy.**
 
-Initial focus: artifact provenance and attestations, SBOM validation, signed release artifacts, deployment policy enforcement, secret-management boundaries, runtime security posture and production change-control gates.
+Initial focus: authentication boundary review, authorization policy enforcement, tenant context propagation, privileged-operation controls, session/token lifecycle, service-to-service identity, administrative auditability and authorization regression gates.
