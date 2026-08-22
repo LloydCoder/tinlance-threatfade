@@ -1,5 +1,7 @@
 # syntax=docker/dockerfile:1@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
-FROM python:3.12.13-slim-trixie@sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb9de9fc7ad142b1877b5830d36
+ARG PYTHON_BASE_TAG=3.12.14-slim-trixie
+ARG PYTHON_BASE_DIGEST
+FROM python:${PYTHON_BASE_TAG}@${PYTHON_BASE_DIGEST}
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -19,7 +21,8 @@ RUN addgroup --system threatfade && adduser --system --ingroup threatfade threat
 WORKDIR /app
 
 COPY requirements.txt ./
-RUN pip install --no-cache-dir --disable-pip-version-check -r requirements.txt
+RUN python -m pip install --no-cache-dir --disable-pip-version-check --upgrade pip \
+    && python -m pip install --no-cache-dir --disable-pip-version-check -r requirements.txt
 COPY . .
 
 RUN mkdir -p /app/reports /app/tmp && chown -R threatfade:threatfade /app
