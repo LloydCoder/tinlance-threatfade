@@ -1,0 +1,14 @@
+# Production release template. CI/CD must render THREATFADE_IMAGE as a fully qualified
+# OCI image reference containing an immutable @sha256:<64-hex> digest.
+# Do not apply this template directly.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: threatfade
+spec:
+  template:
+    spec:
+      containers:
+        - name: threatfade
+          image: ${THREATFADE_IMAGE}
+          imagePullPolicy: Always
