@@ -1,5 +1,5 @@
-# syntax=docker/dockerfile:1
-FROM python:3.12.13-slim-bookworm@sha256:a116514e19457bcb7af7efe9c3dd0b9b71e85b317694e7882a1c52aa15a78134
+# syntax=docker/dockerfile:1@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
+FROM python:3.12.13-slim-trixie@sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb9de9fc7ad142b1877b5830d36
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -10,6 +10,10 @@ LABEL org.opencontainers.image.source="https://github.com/LloydCoder/tinlance-th
       org.opencontainers.image.title="ThreatFade" \
       org.opencontainers.image.description="Open-core network threat detection oracle" \
       org.opencontainers.image.licenses="Apache-2.0"
+
+RUN apt-get update \
+    && apt-get dist-upgrade -y \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN addgroup --system threatfade && adduser --system --ingroup threatfade threatfade
 WORKDIR /app
