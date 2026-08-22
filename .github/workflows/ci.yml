@@ -48,6 +48,8 @@ jobs:
         run: python scripts/validate_identity_architecture.py
       - name: Validate detection science architecture
         run: python scripts/validate_detection_science.py
+      - name: Validate corpus governance architecture
+        run: python scripts/validate_corpus_architecture.py
       - name: Validate supply-chain architecture
         run: python scripts/validate_supply_chain.py
       - name: Validate ground-truth corpus contract
@@ -122,15 +124,15 @@ jobs:
       - name: Apply production migration
         run: alembic upgrade head
       - name: Resolve current migration head
-        run: echo "THREATFADE_MIGRATION_HEAD=$(alembic current | awk '/\(head\)/ {print $1; exit}')" >> "$GITHUB_ENV"
+        run: echo "THREATFARE_MIGRATION_HEAD=$(alembic current | awk '/\(head\)/ {print $1; exit}')" >> "$GITHUB_ENV"
       - name: Assert migration head resolved
-        run: test -n "$THREATFADE_MIGRATION_HEAD"
+        run: test -n "$THREATFARE_MIGRATION_HEAD"
       - name: Create least-privileged application role
         run: |
           python - <<'PY'
           from sqlalchemy import create_engine, text
           import os
-          engine = create_engine(os.environ['THREATFADE_DATABASE_URL'])
+          engine = create_engine(os.environ['THREATFARE_DATABASE_URL'])
           with engine.begin() as conn:
               conn.execute(text("DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'threatfade_app') THEN CREATE ROLE threatfade_app LOGIN PASSWORD 'threatfade_app' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS; END IF; END $$;"))
               conn.execute(text("GRANT CONNECT ON DATABASE threatfade TO threatfade_app"))
@@ -158,7 +160,7 @@ jobs:
           PGPASSWORD=threatfade psql -h localhost -U threatfade -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS threatfade_restore WITH (FORCE);'
           PGPASSWORD=threatfade psql -h localhost -U threatfade -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE threatfade_restore;'
       - name: Restore and verify isolated database
-        run: python scripts/restore_drill.py "$RECOVERY_ARCHIVE" --target-url "$THREATFADE_RESTORE_DATABASE_URL" --expected-revision "$THREATFADE_MIGRATION_HEAD"
+        run: python scripts/restore_drill.py "$RECOVERY_ARCHIVE" --target-url "$THREATFARE_RESTORE_DATABASE_URL" --expected-revision "$THREATFARE_MIGRATION_HEAD"
       - name: Cleanup restore database
         if: always()
         run: PGPASSWORD=threatfade psql -h localhost -U threatfade -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS threatfade_restore WITH (FORCE);'
