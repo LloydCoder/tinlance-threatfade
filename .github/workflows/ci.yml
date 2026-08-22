@@ -60,6 +60,8 @@ jobs:
         run: pytest -q
       - name: Run reproducible benchmark
         run: python benchmarks/benchmark.py
+      - name: Run Detection Science 2.0 synthetic benchmark
+        run: python benchmarks/detection_science_v2.py
       - name: Run adversarial synthetic benchmark
         run: python benchmarks/adversarial.py
       - name: Validate detection pack
