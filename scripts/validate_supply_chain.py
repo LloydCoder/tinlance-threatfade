@@ -15,16 +15,20 @@ def assert_true(condition: bool, message: str) -> None:
 
 def main() -> None:
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
-    assert_true(re.search(r"^FROM\s+\S+@sha256:[0-9a-f]{64}\s*$", dockerfile, re.M) is not None, "Docker base image must be digest pinned")
+    assert_true("ARG PYTHON_BASE_TAG=3.12.14-slim-trixie" in dockerfile, "Python base tag must target the current patched 3.12 release")
+    assert_true("ARG PYTHON_BASE_DIGEST" in dockerfile and "FROM python:${PYTHON_BASE_TAG}@${PYTHON_BASE_DIGEST}" in dockerfile, "Python base image must be injected by immutable digest")
     assert_true("USER threatfade" in dockerfile, "container must run as non-root")
     assert_true("org.opencontainers.image.source" in dockerfile, "OCI source label required")
     assert_true("HEALTHCHECK" in dockerfile, "container healthcheck required")
+    assert_true("--upgrade pip" in dockerfile, "pip must be upgraded during image build")
 
     workflow_dir = ROOT / ".github" / "workflows"
     workflow_text = "\n".join(p.read_text(encoding="utf-8") for p in workflow_dir.glob("*.yml"))
     action_refs = re.findall(r"uses:\s*([^\s]+)@([^\s]+)", workflow_text)
     unpinned = [f"{name}@{ref}" for name, ref in action_refs if not re.fullmatch(r"[0-9a-f]{40}", ref)]
     assert_true(not unpinned, f"all GitHub Actions must be SHA pinned: {unpinned}")
+    assert_true("docker buildx imagetools inspect python:3.12.14-slim-trixie" in workflow_text, "CI must resolve the current base image digest")
+    assert_true("PYTHON_BASE_DIGEST" in workflow_text, "CI must pass the resolved base digest into Docker builds")
 
     manifest = list(yaml.safe_load_all((ROOT / "deploy/kubernetes/deployment.yaml").read_text(encoding="utf-8")))
     deployment = next(item for item in manifest if item.get("kind") == "Deployment")
