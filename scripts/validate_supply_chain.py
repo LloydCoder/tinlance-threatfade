@@ -15,7 +15,7 @@ def assert_true(condition: bool, message: str) -> None:
 
 def main() -> None:
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
-    assert_true("ARG PYTHON_BASE_TAG=3.12.14-slim-trixie" in dockerfile, "Python base tag must target the current patched 3.12 release")
+    assert_true("ARG PYTHON_BASE_TAG=3.13.15-slim-trixie" in dockerfile, "Python base tag must target the current supported 3.13.15 release")
     assert_true("ARG PYTHON_BASE_DIGEST" in dockerfile and "FROM python:${PYTHON_BASE_TAG}@${PYTHON_BASE_DIGEST}" in dockerfile, "Python base image must be injected by immutable digest")
     assert_true("USER threatfade" in dockerfile, "container must run as non-root")
     assert_true("org.opencontainers.image.source" in dockerfile, "OCI source label required")
