@@ -3,7 +3,7 @@
 **Program:** Enterprise Hardening  
 **Current release baseline:** v0.4.0  
 **Current group:** Group 1 — Security Architecture & Threat Model  
-**Current build:** Build 15  
+**Current build:** Build 17  
 **Status:** GREEN — architecture baseline complete; CI verification required on each change
 
 ## Group 1 deliverables
@@ -37,6 +37,7 @@
 - [x] NIST CSF 2.0 alignment documented.
 - [x] Deterministic documentation validation added to CI.
 - [x] No unsupported certification claim introduced.
+- [ ] GitHub Actions verification — pending this CI verification PR.
 
 ## Important boundary
 
