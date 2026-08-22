@@ -1,10 +1,4 @@
-"""ThreatFade Detection Science 2.0 primitives.
-
-The module deliberately keeps feature extraction deterministic and explainable.
-It operates on ordered signal observations and does not require decryption or
-external services. It provides temporal, baseline and beaconing evidence that
-can be combined with the existing entropy/z-score detector.
-"""
+"""ThreatFade Detection Science 2.0 primitives."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -12,7 +6,6 @@ from math import isfinite
 from typing import Iterable, Mapping, Sequence
 
 import numpy as np
-
 
 EPSILON = 1e-12
 
@@ -100,13 +93,8 @@ def _lag1_autocorrelation(values: np.ndarray) -> float:
     return float(np.dot(left, right) / denominator) if denominator > EPSILON else 0.0
 
 
-def extract_temporal_features(
-    values: Sequence[float] | Iterable[float],
-    *,
-    low_signal_threshold: float = 0.5,
-    edge_fraction: float = 0.2,
-) -> TemporalFeatures:
-    """Extract stable temporal fade features from a signal sequence."""
+def extract_temporal_features(values: Sequence[float] | Iterable[float], *, low_signal_threshold: float = 0.5, edge_fraction: float = 0.2) -> TemporalFeatures:
+    """Extract stable temporal fade features with bounded runtime."""
     if not 0.0 < edge_fraction <= 0.5:
         raise ValueError("edge_fraction must be in (0, 0.5]")
     arr = _finite_array(values)
@@ -128,16 +116,17 @@ def extract_temporal_features(
     slope_zscore = float(abs(slope) * np.std(x) / max(std, EPSILON))
 
     change_point_index = -1
-    best_change = 0.0
-    if n >= 8:
+    if n >= 8 and std > EPSILON:
         prefix = np.cumsum(arr)
-        for idx in range(4, n - 3):
-            left = float(prefix[idx - 1] / idx)
-            right = float((prefix[-1] - prefix[idx - 1]) / (n - idx))
-            shift = abs(left - right) / max(std, EPSILON)
-            if shift > best_change:
-                best_change = shift
-                change_point_index = idx
+        candidate_count = min(4096, n - 7)
+        candidates = np.linspace(4, n - 4, candidate_count, dtype=np.int64)
+        candidates = np.unique(candidates)
+        left_count = candidates.astype(np.float64)
+        right_count = n - candidates
+        left_mean = prefix[candidates - 1] / left_count
+        right_mean = (prefix[-1] - prefix[candidates - 1]) / right_count
+        shifts = np.abs(left_mean - right_mean) / std
+        change_point_index = int(candidates[int(np.argmax(shifts))])
 
     low = arr < float(low_signal_threshold)
     low_signal_ratio = float(np.mean(low))
@@ -151,30 +140,13 @@ def extract_temporal_features(
     differences = np.diff(arr)
     difference_std = float(np.std(differences)) if differences.size else 0.0
     return TemporalFeatures(
-        sample_count=n,
-        mean=mean,
-        std=std,
-        coefficient_of_variation=_safe_cv(arr),
-        first_mean=first_mean,
-        last_mean=last_mean,
-        relative_change=relative_change,
-        slope=slope,
-        slope_zscore=slope_zscore,
-        change_point_index=change_point_index,
-        fade_depth=fade_depth,
-        recovery_ratio=recovery_ratio,
-        low_signal_ratio=low_signal_ratio,
-        longest_low_run=longest_low_run,
-        difference_std=difference_std,
-        lag1_autocorrelation=_lag1_autocorrelation(arr),
+        n, mean, std, _safe_cv(arr), first_mean, last_mean, relative_change,
+        slope, slope_zscore, change_point_index, fade_depth, recovery_ratio,
+        low_signal_ratio, longest_low_run, difference_std, _lag1_autocorrelation(arr),
     )
 
 
-def extract_beacon_features(
-    timestamps: Sequence[float] | Iterable[float],
-    *,
-    silence_multiplier: float = 2.5,
-) -> BeaconFeatures:
+def extract_beacon_features(timestamps: Sequence[float] | Iterable[float], *, silence_multiplier: float = 2.5) -> BeaconFeatures:
     """Measure periodicity, jitter and silence in an event timestamp sequence."""
     ts = _finite_array(timestamps)
     if ts.size < 2:
@@ -196,7 +168,6 @@ def extract_beacon_features(
 @dataclass
 class AdaptiveBaseline:
     """Bounded EWMA baseline suitable for streaming signal features."""
-
     decay: float = 0.05
     min_support: int = 8
     mean: float | None = None
@@ -218,9 +189,7 @@ class AdaptiveBaseline:
         if not isfinite(value):
             raise ValueError("baseline values must be finite")
         if self.mean is None:
-            self.mean = value
-            self.variance = 0.0
-            self.support = 1
+            self.mean, self.variance, self.support = value, 0.0, 1
             return
         delta = value - self.mean
         alpha = self.decay
@@ -244,39 +213,19 @@ class AdaptiveBaseline:
         return evidence
 
 
-def behavioral_evidence(
-    temporal: TemporalFeatures,
-    beacon: BeaconFeatures | None = None,
-) -> Mapping[str, float]:
+def behavioral_evidence(temporal: TemporalFeatures, beacon: BeaconFeatures | None = None) -> Mapping[str, float]:
     """Return normalized evidence components; these are not probabilities."""
     sustained_drop = float(np.clip(max(0.0, -temporal.relative_change), 0.0, 1.0))
     change = float(np.clip(temporal.slope_zscore / 3.0, 0.0, 1.0))
     persistence = float(np.clip(temporal.longest_low_run / max(temporal.sample_count * 0.5, 1), 0.0, 1.0))
     recovery = float(np.clip(temporal.recovery_ratio, 0.0, 1.0))
     periodicity = float(beacon.periodicity_score if beacon else 0.0)
-    # Periodicity is contextual evidence only when a fade/change signal exists.
     periodicity_context = periodicity * max(sustained_drop, change, persistence)
-    return {
-        "sustained_drop": sustained_drop,
-        "change_point": change,
-        "persistence": persistence,
-        "recovery": recovery,
-        "periodicity": periodicity_context,
-    }
+    return {"sustained_drop": sustained_drop, "change_point": change, "persistence": persistence, "recovery": recovery, "periodicity": periodicity_context}
 
 
-def combine_evidence(
-    *,
-    rule_score: float,
-    baseline_score: float,
-    behavioral: Mapping[str, float],
-    ml_score: float = 0.0,
-) -> tuple[float, dict[str, float]]:
-    """Combine independent evidence into a bounded, explainable score.
-
-    The output is an anomaly score, not a calibrated probability. ML is capped
-    so a model cannot override strong contradictory deterministic evidence.
-    """
+def combine_evidence(*, rule_score: float, baseline_score: float, behavioral: Mapping[str, float], ml_score: float = 0.0) -> tuple[float, dict[str, float]]:
+    """Combine independent evidence into a bounded, explainable anomaly score."""
     components = {
         "rule": float(np.clip(rule_score, 0.0, 1.0)),
         "baseline": float(np.clip(baseline_score, 0.0, 1.0)),
@@ -287,14 +236,5 @@ def combine_evidence(
         "periodicity": float(np.clip(behavioral.get("periodicity", 0.0), 0.0, 1.0)),
         "ml": float(np.clip(ml_score, 0.0, 1.0)),
     }
-    score = (
-        0.30 * components["rule"]
-        + 0.18 * components["baseline"]
-        + 0.18 * components["sustained_drop"]
-        + 0.10 * components["change_point"]
-        + 0.10 * components["persistence"]
-        + 0.05 * components["periodicity"]
-        + 0.04 * components["ml"]
-        + 0.05 * components["recovery"]
-    )
+    score = (0.30 * components["rule"] + 0.18 * components["baseline"] + 0.18 * components["sustained_drop"] + 0.10 * components["change_point"] + 0.10 * components["persistence"] + 0.05 * components["periodicity"] + 0.04 * components["ml"] + 0.05 * components["recovery"])
     return float(np.clip(score, 0.0, 1.0)), components
