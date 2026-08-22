@@ -2,6 +2,24 @@
 
 All notable changes to ThreatFade will be documented in this file.
 
+## [0.6.0] – 2026-08-22
+
+### Disaster Recovery, Backup & Operational Continuity
+
+#### Added
+- Portable PostgreSQL custom-format backup generator with SHA-256 integrity manifest.
+- Credential-safe PostgreSQL command construction using `PGPASSWORD` instead of database credentials in command-line arguments.
+- Backup catalog verification using `pg_restore --list`.
+- Isolated restore drill verifying Alembic migration state, required enterprise tables and forced PostgreSQL RLS.
+- Disaster-recovery architecture acceptance gate.
+- CI-integrated backup creation, artifact verification and isolated restore verification against PostgreSQL 16.
+- Recovery runbook defining RPO/RTO targets, backup tiers, restore procedure, integrity checks and infrastructure boundaries.
+
+#### Operational notes
+- Production low-RPO recovery is expected to use provider-native PostgreSQL PITR/WAL archiving; the repository's logical dump is a complementary portable recovery mechanism.
+- CI recovery artifacts are ephemeral and are never committed to the repository.
+- RPO/RTO values are engineering targets, not contractual guarantees.
+
 ## [0.5.0] – 2026-08-22
 
 ### Reliability, Observability & Resilience
@@ -32,19 +50,9 @@ All notable changes to ThreatFade will be documented in this file.
 
 #### Added
 - Core fade detection engine (entropy + z-score + rule-based)
-- Multi-scenario signal simulation:
-  - C2 Command & Control quieting
-  - Living-Off-The-Land (LOTL) gradual decline
-  - GNSS jamming (cyber-physical)
-  - False positive scenarios
-  - Mixed scenario combinations
-- Dark-mode cyberpunk PNG visualization
-- MITRE ATT&CK TTP stub matching
-- Volatility memory artifact simulation (reference)
-- Telegram real-time alerting with PNG reports
+- Multi-scenario signal simulation
 - JSON report export
 - Comprehensive pytest test suite
-- Rich console output with colored formatting
 - YAML configuration management
 - Environment variable support for secrets
 - GitHub Actions CI/CD pipeline
@@ -54,27 +62,8 @@ All notable changes to ThreatFade will be documented in this file.
 - Detection trained on simulated data only
 - False positive rate unknown on real traffic
 - MITRE/Volatility implementations are stubs
-- Telegram-only alerts (SIEM export coming Q2)
-- No endpoint agents yet (Python CLI only)
-- No performance benchmarks
-
-#### Planned for Q2 2026
-- Real pcap/network traffic analysis
-- Endpoint agents (Windows/Linux/macOS)
-- SIEM export (Splunk, ELK, Splunk HEC)
-- Web dashboard prototype
-- Mobile agent stubs (iOS/Android)
-- Performance optimization & benchmarking
-
-#### Planned for Q3 2026
-- Satellite data fusion
-- Rugged MIL-STD hardware stubs
-- Cross-platform agent deployment
-
-#### Planned for Q4 2026
-- Enterprise federation protocol
-- Quantum cryptography layer
-- Full ecosystem integration
+- Telegram-only alerts
+- No endpoint agents yet
 
 ---
 

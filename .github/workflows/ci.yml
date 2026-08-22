@@ -45,6 +45,8 @@ jobs:
         run: python scripts/validate_ground_truth.py
       - name: Validate reliability architecture
         run: python scripts/validate_reliability.py
+      - name: Validate disaster recovery architecture
+        run: python scripts/validate_disaster_recovery.py
       - name: Run complete test suite
         run: pytest -q
       - name: Run reproducible benchmark
@@ -62,11 +64,13 @@ jobs:
 
   postgres-integrity:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
       PYTHONPATH: ${{ github.workspace }}
       THREATFADE_DATABASE_URL: postgresql+psycopg://threatfade:threatfade@localhost:5432/threatfade
       THREATFADE_APP_DATABASE_URL: postgresql+psycopg://threatfade_app:threatfade_app@localhost:5432/threatfade
+      THREATFADE_RESTORE_DATABASE_URL: postgresql+psycopg://threatfade:threatfade@localhost:5432/threatfade_restore
+      THREATFADE_POSTGRES_MAJOR: '16'
     services:
       postgres:
         image: postgres:16.10
@@ -97,11 +101,15 @@ jobs:
           pip install -r requirements.txt
       - name: Apply production migration
         run: alembic upgrade head
+      - name: Resolve current migration head
+        run: echo "THREATFADE_MIGRATION_HEAD=$(alembic current | awk '/\(head\)/ {print $1; exit}')" >> "$GITHUB_ENV"
+      - name: Assert migration head resolved
+        run: test -n "$THREATFADE_MIGRATION_HEAD"
       - name: Create least-privileged application role
         run: |
           python - <<'PY'
-          import os
           from sqlalchemy import create_engine, text
+          import os
           engine = create_engine(os.environ['THREATFADE_DATABASE_URL'])
           with engine.begin() as conn:
               conn.execute(text("DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'threatfade_app') THEN CREATE ROLE threatfade_app LOGIN PASSWORD 'threatfade_app' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS; END IF; END $$;"))
@@ -115,3 +123,22 @@ jobs:
         env:
           THREATFADE_DATABASE_URL: ${{ env.THREATFADE_APP_DATABASE_URL }}
         run: python scripts/validate_postgres_integrity.py
+      - name: Create logical recovery artifact
+        run: python scripts/backup.py ./recovery-artifact
+      - name: Verify recovery artifact checksum and catalog
+        shell: bash
+        run: |
+          archive=$(find recovery-artifact -name '*.dump' -type f | head -n 1)
+          manifest=$(find recovery-artifact -name '*.manifest.json' -type f | head -n 1)
+          test -n "$archive" && test -n "$manifest"
+          python scripts/restore_verify.py "$archive" "$manifest"
+          echo "RECOVERY_ARCHIVE=$archive" >> "$GITHUB_ENV"
+      - name: Create isolated restore database
+        run: |
+          PGPASSWORD=threatfade psql -h localhost -U threatfade -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS threatfade_restore WITH (FORCE);'
+          PGPASSWORD=threatfade psql -h localhost -U threatfade -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE threatfade_restore;'
+      - name: Restore and verify isolated database
+        run: python scripts/restore_drill.py "$RECOVERY_ARCHIVE" --target-url "$THREATFADE_RESTORE_DATABASE_URL" --expected-revision "$THREATFADE_MIGRATION_HEAD"
+      - name: Cleanup restore database
+        if: always()
+        run: PGPASSWORD=threatfade psql -h localhost -U threatfade -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS threatfade_restore WITH (FORCE);'
