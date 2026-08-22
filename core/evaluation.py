@@ -79,10 +79,10 @@ def ranking_metrics(cases: Sequence[EvaluationCase]) -> dict:
     fp = np.cumsum(1 - y)[thresholds]
     tpr = np.r_[0.0, tp / positives, 1.0]
     fpr = np.r_[0.0, fp / negatives, 1.0]
-    auroc = float(np.trapz(tpr, fpr))
+    auroc = float(np.trapezoid(tpr, fpr))
     recall = np.r_[0.0, tp / positives]
     precision = np.r_[1.0, tp / np.maximum(tp + fp, 1)]
-    auprc = float(np.trapz(precision, recall))
+    auprc = float(np.trapezoid(precision, recall))
     return {"scored_support": len(scored), "auroc": auroc, "auprc": auprc}
 
 
