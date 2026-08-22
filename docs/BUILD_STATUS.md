@@ -2,9 +2,9 @@
 
 **Program:** Enterprise Hardening  
 **Current release baseline:** v0.7.0  
-**Current group:** Group 9 — ThreatFade Detection Science 2.0  
-**Current build:** Build 62  
-**Status:** GROUP 9 GREEN — hosted CI, security and supply-chain verification passed
+**Current group:** Group 11 — Detection Data Plane & Sensor Architecture  
+**Current build:** Builds 71–78  
+**Status:** GROUP 11 IMPLEMENTED — pending hosted CI/security/supply-chain release gates
 
 ## Completed groups
 
@@ -17,75 +17,50 @@
 - Group 7 — Secure Deployment, Supply Chain & Production Operations: ✅ Builds 42–46
 - Group 8 — Identity, Access Control & Enterprise Multi-Tenancy: ✅ Builds 47–52
 - Group 9 — ThreatFade Detection Science 2.0: ✅ Builds 53–62
+- Group 10 — Real-World Evidence & Validation Framework: ✅ Builds 63–70
 
-## Group 9 — ThreatFade Detection Science 2.0
+## Group 11 — Detection Data Plane & Sensor Architecture
 
 | Build | Deliverable | Status |
 |---|---|---|
-| 53 | Temporal feature extraction and canonical signal evidence | 🟢 |
-| 54 | Canonical packet/flow/session feature model | 🟢 |
-| 55 | Beacon periodicity, jitter and silence-window evidence | 🟢 |
-| 56 | Fade-window temporal/change-point modeling | 🟢 |
-| 57 | Adaptive EWMA baseline and deviation evidence | 🟢 |
-| 58 | Protocol-aware encrypted-traffic metadata (QUIC/TLS/DNS/HTTP/SSH/RDP heuristics) | 🟢 |
-| 59 | Explainable deterministic evidence ensemble | 🟢 |
-| 60 | Offline ML governance, feature-schema versioning and drift indicators | 🟢 |
-| 61 | Held-out isotonic score calibration with freeze semantics | 🟢 |
-| 62 | Adversarial/synthetic regression benchmark and Detection Science CI gate | 🟢 |
+| 71 | Canonical immutable signal/packet/flow/session event schema | 🟢 |
+| 72 | Transport-agnostic live-sensor ingestion contract | 🟢 |
+| 73 | Bounded ingestion queue with explicit backpressure/drop metrics | 🟢 |
+| 74 | Tenant-bound sensor identity and lifecycle registry | 🟢 |
+| 75 | Active/revoked sensor admission control | 🟢 |
+| 76 | Deterministic event canonicalization and SHA-256 integrity digest | 🟢 |
+| 77 | Reference endpoint/edge sensor adapter without privileged capture side effects | 🟢 |
+| 78 | Group 11 architecture gate and regression suite | 🟢 |
 
-### Group 9 implementation evidence
+### Group 11 implementation evidence
 
-- `core/detection_science.py`
-- `core/flow_features.py`
-- `core/score_calibration.py`
-- `core/ml_governance.py`
-- `core/fade_engine.py`
-- `tests/test_detection_science.py`
-- `tests/test_flow_features.py`
-- `tests/test_score_calibration.py`
-- `tests/test_ml_governance.py`
-- `benchmarks/detection_science_v2.py`
-- `scripts/validate_detection_science.py`
-- `docs/GROUP_9_DETECTION_SCIENCE.md`
-- `.github/workflows/ci.yml`
+- `core/data_plane.py`
+- `agents/sensor.py`
+- `tests/test_data_plane.py`
+- `scripts/validate_data_plane.py`
+- `.github/workflows/group11-data-plane.yml`
+- `docs/GROUP_11_DATA_PLANE.md`
 
-### Group 9 acceptance gate
+### Group 11 acceptance gate
 
-- [x] Legacy entropy/z-score detection remains available and regression-tested.
-- [x] Temporal fade evidence is deterministic, bounded and explainable.
-- [x] Change-point search has bounded candidate evaluation for large captures.
-- [x] Adaptive baseline initialization avoids per-packet Python loops on large signals.
-- [x] Beacon periodicity/jitter/silence evidence is timestamp-validated.
-- [x] Periodicity is contextual and cannot independently create a detection signal.
-- [x] Flow/session features use normalized packet observations and bidirectional sessionization.
-- [x] Protocol inference is explicitly heuristic metadata and does not claim decryption.
-- [x] ML remains supporting evidence rather than an implicit probability claim.
-- [x] Model provenance and drift primitives are available offline.
-- [x] Score calibration requires both classes, uses a held-out tuning contract, and can be frozen.
-- [x] Detection Science 2.0 synthetic and adversarial benchmarks run in CI.
-- [x] Python 3.11 and 3.12 complete test suites pass.
-- [x] PostgreSQL integrity/tenant isolation and recovery drill pass.
-- [x] ThreatFade Security passes: secret scan, CodeQL and dependency audit.
-- [x] ThreatFade Supply Chain passes: immutable image build, SPDX SBOM, vulnerability gate, configuration scan, policy validation and digest-pinned manifest test.
-
-## Group 9 verification evidence
-
-Final verified commit: `78143cb10e6e1844e1237ab98a47ea664beaa704`
-
-Hosted workflows:
-
-- ThreatFade CI — run #307: 🟢 success
-- ThreatFade Security — run #229: 🟢 success
-- ThreatFade Supply Chain — run #56: 🟢 success
-
-The final test matrix reported 190+ passing tests on the completed runs, including the new Detection Science, flow/session, calibration and ML-governance suites. The exact count remains an implementation detail and the acceptance gate is the complete green test run, not a fixed historical test count.
+- [x] A single versioned event schema is used for packet, flow, session and signal observations.
+- [x] Events require timezone-aware observation timestamps and bounded metadata.
+- [x] Canonical serialization is deterministic and SHA-256 integrity digests are available.
+- [x] Ingestion is bounded and exposes accepted/dropped/depth metrics instead of silently growing memory.
+- [x] Sensor identities are cryptographically fingerprinted and cannot be rebound across tenants.
+- [x] Sensors must be explicitly active before they can emit events.
+- [x] Revoked/draining sensors cannot ingest new events.
+- [x] The reference adapter is transport-agnostic and does not execute shell commands or open raw sockets.
+- [x] Tenant identity is bound to the registered sensor rather than caller-supplied event metadata.
+- [x] Data-plane controls have dedicated regression coverage and a fail-closed architecture gate.
+- [ ] Hosted CI, security and supply-chain workflows are green for the final PR head.
 
 ## Verification boundary
 
-Automated tests and CI demonstrate implementation and regression evidence. They do not constitute independent penetration testing, SOC 2/ISO certification, independent detection validation, contractual SLAs, provider-specific PITR guarantees, or customer-scale performance guarantees.
+Group 11 introduces the canonical data-plane contract and sensor lifecycle controls. It does **not** claim that a production packet-capture implementation, sensor fleet rollout, or customer-scale throughput has been independently validated. Those remain deployment/performance work and require measured evidence.
 
 ## Next planned group
 
-**Group 10 — Real-World Evidence & Independent Validation.**
+**Group 12 — Production SOC / Analyst Platform.**
 
-Focus: governed threat corpus, dataset provenance, blind train/tune/test/holdout separation, larger deterministic benchmarks, environmental diversity, purple-team evaluation and an independent-validation package.
+Focus: detection inbox, investigation workspace, entity correlation, case-management completion, analyst feedback and end-to-end detection-to-disposition workflow.
