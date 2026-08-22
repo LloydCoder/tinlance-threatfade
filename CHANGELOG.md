@@ -2,6 +2,28 @@
 
 All notable changes to ThreatFade will be documented in this file.
 
+## [0.5.0] – 2026-08-22
+
+### Reliability, Observability & Resilience
+
+#### Added
+- Prometheus-compatible request counters, latency histograms, in-flight gauges, detection counters and build metadata.
+- Low-cardinality HTTP telemetry with optional OpenTelemetry tracing spans.
+- Dependency-aware readiness checks with real database connectivity validation.
+- Explicit liveness, readiness and startup operational endpoints.
+- FastAPI lifespan lifecycle state for controlled startup and shutdown.
+- Bounded exponential retry policy with jitter and transient-error filtering.
+- Thread-safe circuit breaker with closed/open/half-open recovery.
+- Synchronous and asynchronous bulkhead primitives for bounded concurrency.
+- Reliability acceptance script and regression tests.
+- Kubernetes startup/readiness/liveness probes, safe rolling updates, topology spread and PodDisruptionBudget.
+- Container healthcheck now tests liveness independently of backend readiness.
+
+#### Operational notes
+- Readiness returns `503` when required storage is unavailable or the application is draining.
+- Resilience controls fail closed rather than silently discarding detection work.
+- Metrics intentionally avoid tenant/user identifiers as labels to prevent high-cardinality telemetry.
+
 ## [1.0.0-beta] – 2026-03-09
 
 ### Initial Release
@@ -58,9 +80,7 @@ All notable changes to ThreatFade will be documented in this file.
 
 ## Versioning
 
-This project follows [Semantic Versioning](https://semver.org/):
-- **MAJOR.MINOR.PATCH-PRERELEASE**
-- Example: `1.0.0-beta`, `1.1.0-rc1`, `2.0.0`
+This project follows Semantic Versioning.
 
 ## Contributing
 

@@ -1,10 +1,10 @@
 # ThreatFade Enterprise Build Status
 
 **Program:** Enterprise Hardening  
-**Current release baseline:** v0.4.0  
-**Current group:** Group 3 — Detection Pack Platform  
-**Current build:** Build 24  
-**Status:** BUILD 24 IMPLEMENTED — hosted CI verification remains the release gate
+**Current release baseline:** v0.5.0  
+**Current group:** Group 5 — Reliability, Observability & Resilience  
+**Current build:** Build 37  
+**Status:** IMPLEMENTATION COMPLETE — hosted CI verification is the release gate
 
 ## Group 1 — Security Architecture & Threat Model
 
@@ -25,28 +25,70 @@
 | 22 | Reproducible tuning-set threshold calibration with constrained FPR option | ✅ Complete |
 | 23 | Deterministic adversarial perturbation harness and group CI gate | ✅ Complete |
 
-**Group 2 gate:** implementation complete. Synthetic results remain regression evidence only; real-world and independent validation are explicitly deferred to later assurance work.
-
 ## Group 3 — Detection Pack Platform
 
 | Build | Deliverable | Status |
 |---|---|---|
-| 24 | Immutable detection-pack identity, canonical content hashing and lifecycle promotion primitives | 🟢 Implemented |
-| 25 | Pack manifest/schema hardening and semantic compatibility validation | ⏳ Next |
-| 26 | Pack signing/verification and provenance | ⏳ Planned |
-| 27 | Canary/production registry, rollback and pack regression gate | ⏳ Planned |
+| 24 | Immutable detection-pack identity, canonical content hashing and lifecycle promotion primitives | ✅ Complete |
+| 25 | Pack manifest/schema hardening and semantic compatibility validation | ✅ Complete |
+| 26 | Pack Ed25519 signing/verification and in-toto/SLSA-shaped provenance | ✅ Complete |
+| 27 | Controlled canary/production lifecycle, rollback and pack regression gate | ✅ Complete |
 
-### Build 24 evidence
+## Group 4 — Data Integrity, Evidence & Audit
 
-- `core/detection_pack_registry.py`
-- `tests/test_detection_pack_registry.py`
+| Build | Deliverable | Status |
+|---|---|---|
+| 28 | Alembic/PostgreSQL production schema and migration boundary | ✅ Complete |
+| 29 | PostgreSQL row-level tenant isolation and application tenant context | ✅ Complete |
+| 30 | Append-only cryptographically chained audit with export and correlation IDs | ✅ Complete |
+| 31 | Evidence hashing, custody chain and integrity manifests | ✅ Complete |
+| 32 | Detection/input/rule-pack/engine/model/config provenance and investigation timeline | ✅ Complete |
+| 33 | Retention policy/legal hold primitives, regression gates and enterprise integrity verification | ✅ Complete |
 
-The registry currently enforces the lifecycle ordering `research → validated → canary → production → deprecated`, with explicit controlled rollback transitions where permitted. Pack identity includes a canonical SHA-256 content digest so mutation is detectable.
+## Group 5 — Reliability, Observability & Resilience
+
+| Build | Deliverable | Status |
+|---|---|---|
+| 34 | Production metrics, low-cardinality request telemetry and OpenTelemetry-compatible spans | 🟢 Implemented |
+| 35 | Dependency-aware liveness/readiness/startup health model and graceful application lifecycle | 🟢 Implemented |
+| 36 | Bounded retry, circuit-breaker and concurrency/bulkhead resilience primitives | 🟢 Implemented |
+| 37 | Kubernetes startup/readiness/liveness hardening, rolling-update safety, topology spreading and PodDisruptionBudget | 🟢 Implemented |
+
+### Group 5 evidence
+
+- `core/observability.py`
+- `core/health.py`
+- `core/reliability.py`
+- `core/reliability_routes.py`
+- `enterprise_app.py`
+- `deploy/kubernetes/deployment.yaml`
+- `tests/test_reliability.py`
+- `tests/test_operational_endpoints.py`
+- `scripts/validate_reliability.py`
+
+The production entrypoint now exposes Prometheus-compatible metrics and low-cardinality HTTP telemetry, while retaining optional OpenTelemetry tracing. Readiness performs a real storage dependency check and distinguishes liveness from dependency readiness. FastAPI lifespan state provides lifecycle coordination, and Kubernetes uses startup, liveness and readiness probes with a conservative rolling strategy, topology spread, graceful termination delay and disruption budget. Resilience primitives explicitly bound retries, failure recovery and concurrency rather than allowing unbounded work to accumulate.
+
+### Group 5 acceptance gate
+
+- [x] Request counters, latency histograms and in-flight telemetry exist.
+- [x] Build metadata is exposed through metrics without tenant/user cardinality.
+- [x] Health is dependency-light and suitable for liveness.
+- [x] Readiness fails closed when storage is unavailable or the process is draining.
+- [x] Startup probe is distinct from readiness and liveness.
+- [x] Retry policy uses bounded exponential backoff with jitter and retries only transient classes.
+- [x] Circuit breaker implements closed/open/half-open recovery semantics.
+- [x] Bulkheads reject excess work rather than creating an unbounded queue.
+- [x] Kubernetes rolling deployment guarantees zero voluntary unavailable replicas during rollout.
+- [x] Pod disruption budget protects minimum service capacity.
+- [x] Production container healthcheck uses liveness, not dependency readiness.
+- [x] Python 3.11/3.12 CI, security gates, PostgreSQL integrity and reliability acceptance tests are mandatory.
 
 ## Verification boundary
 
-The connected GitHub interface available to this session does not expose workflow-run records for the latest commits. Therefore hosted CI cannot be honestly represented as independently observed. The implementation preserves the repository's Python 3.11/3.12 compatibility contract and the existing CI gates; no unsupported green CI claim is made.
+Automated tests and CI demonstrate implementation and regression evidence. They do not constitute independent penetration testing, SOC 2/ISO certification, independent detection validation, contractual SLAs, or customer-scale performance guarantees.
 
-## Next
+## Next planned group
 
-**Build 25 — Detection-pack manifest/schema hardening and semantic compatibility validation.**
+**Group 6 — Disaster Recovery, Backup & Operational Continuity.**
+
+Initial focus: recovery objectives, encrypted/verified backups, migration rollback strategy, restore drills, corruption detection, operational runbooks and CI acceptance of recovery procedures.
