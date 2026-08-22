@@ -1,8 +1,9 @@
-"""Canonical network-flow and session feature primitives.
+"""Canonical network-flow, session and protocol metadata primitives.
 
-The module accepts normalized packet observations so packet capture adapters can
-remain separate from detection science. It intentionally uses metadata only;
-it never requires payload decryption.
+Packet capture adapters supply normalized observations. Detection science can
+therefore consume consistent flow/session features without decrypting traffic.
+Protocol inference is explicitly heuristic metadata, never a claim that an
+application protocol was cryptographically identified.
 """
 from __future__ import annotations
 
@@ -43,6 +44,36 @@ class PacketObservation:
 
 
 @dataclass(frozen=True)
+class ProtocolMetadata:
+    application_protocol: str
+    encrypted_transport: bool
+    confidence: str
+    inference_source: str
+
+    def to_dict(self) -> dict:
+        return self.__dict__.copy()
+
+
+def infer_protocol_metadata(observation: PacketObservation) -> ProtocolMetadata:
+    """Infer coarse protocol metadata from transport and well-known ports."""
+    transport = observation.protocol.upper()
+    ports = {int(observation.src_port), int(observation.dst_port)}
+    if transport == "UDP" and 443 in ports:
+        return ProtocolMetadata("QUIC", True, "medium", "transport+port")
+    if transport == "TCP" and ({443, 853} & ports):
+        return ProtocolMetadata("TLS", True, "medium", "transport+port")
+    if 53 in ports:
+        return ProtocolMetadata("DNS", False, "medium", "port")
+    if 80 in ports:
+        return ProtocolMetadata("HTTP", False, "medium", "port")
+    if 22 in ports:
+        return ProtocolMetadata("SSH", True, "medium", "port")
+    if 3389 in ports:
+        return ProtocolMetadata("RDP", True, "medium", "port")
+    return ProtocolMetadata(transport or "UNKNOWN", False, "low", "transport")
+
+
+@dataclass(frozen=True)
 class FlowFeatures:
     flow_key: tuple
     packet_count: int
@@ -54,6 +85,9 @@ class FlowFeatures:
     packets_per_second: float
     bytes_per_second: float
     upstream_ratio: float
+    application_protocol: str
+    encrypted_transport: bool
+    protocol_confidence: str
 
     def to_dict(self) -> dict:
         return self.__dict__.copy()
@@ -102,11 +136,25 @@ def extract_flow_features(observations: Sequence[PacketObservation]) -> FlowFeat
     payload_bytes = int(sum(item.payload_bytes for item in ordered))
     pps = float(packet_count / duration) if duration > 0 else float(packet_count)
     bps = float(total_bytes / duration) if duration > 0 else float(total_bytes)
-    # Directionality is metadata only and remains bounded for evidence fusion.
     first_src = ordered[0].src_ip
     upstream = sum(1 for item in ordered if item.src_ip == first_src)
     upstream_ratio = float(upstream / packet_count)
-    return FlowFeatures(key, packet_count, total_bytes, payload_bytes, duration, mean_iat, iat_cv, pps, bps, upstream_ratio)
+    protocol_metadata = infer_protocol_metadata(ordered[0])
+    return FlowFeatures(
+        key,
+        packet_count,
+        total_bytes,
+        payload_bytes,
+        duration,
+        mean_iat,
+        iat_cv,
+        pps,
+        bps,
+        upstream_ratio,
+        protocol_metadata.application_protocol,
+        protocol_metadata.encrypted_transport,
+        protocol_metadata.confidence,
+    )
 
 
 def activity_series(
