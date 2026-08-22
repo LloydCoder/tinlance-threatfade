@@ -1,6 +1,6 @@
 # Group 8 — Identity, Access Control & Enterprise Multi-Tenancy
 
-**Status:** Implementation complete pending hosted CI/security verification  
+**Status:** GREEN — complete and merged  
 **Baseline:** ThreatFade v0.7.x  
 **Scope:** Authentication boundary, authorization, tenant isolation, privileged operations and identity regression controls.
 
@@ -65,6 +65,16 @@ No current production endpoint requires a machine-only principal. The Group 8 bo
 `test_enterprise.py` also enforces that the `admin` role alone cannot cross tenant boundaries; cross-tenant administration requires the explicit `global_admin=true` claim.
 
 `scripts/validate_identity_architecture.py` provides a deterministic CI architecture gate against accidental removal of the production OIDC boundary, tenant isolation rule, RSA algorithm allow-list, issuer/audience verification and bounded JWKS retrieval.
+
+## Hosted verification
+
+The merged Group 8 verification commit passed all three required hosted pipelines:
+
+- ThreatFade CI: run 285 — all test matrix and PostgreSQL integrity jobs successful.
+- ThreatFade Security: run 207 — secret scan, dependency audit and CodeQL successful.
+- ThreatFade Supply Chain: run 34 — immutable container build, SPDX SBOM scan, Trivy configuration scan, supply-chain policy and manifest verification successful.
+
+The implementation was merged to `main` after the green verification gate.
 
 ## Verification boundary
 
