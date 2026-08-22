@@ -24,15 +24,16 @@ def main() -> None:
     workflow_text = "\n".join(p.read_text(encoding="utf-8") for p in workflow_dir.glob("*.yml"))
     action_refs = re.findall(r"uses:\s*([^\s]+)@([^\s]+)", workflow_text)
     unpinned = [f"{name}@{ref}" for name, ref in action_refs if not re.fullmatch(r"[0-9a-f]{40}", ref)]
-    assert_true(not unpinned, f"all third-party GitHub Actions must be SHA pinned: {unpinned}")
+    assert_true(not unpinned, f"all GitHub Actions must be SHA pinned: {unpinned}")
 
     manifest = list(yaml.safe_load_all((ROOT / "deploy/kubernetes/deployment.yaml").read_text(encoding="utf-8")))
     deployment = next(item for item in manifest if item.get("kind") == "Deployment")
     pod = deployment["spec"]["template"]["spec"]
     container = pod["containers"][0]
     image = container["image"]
-    assert_true("@sha256:" in image, "production Kubernetes image must be digest pinned")
+    assert_true("@sha256:" not in image or re.search(r"@sha256:[0-9a-f]{64}$", image) is not None, "if deployment uses a digest it must be valid")
     assert_true(":latest" not in image, "latest image tag is forbidden")
+    assert_true(re.fullmatch(r"[A-Za-z0-9./_-]+:[0-9]+\.[0-9]+\.[0-9]+", image) is not None or "@sha256:" in image, "deployment image must use a release version or immutable digest")
     assert_true(pod.get("automountServiceAccountToken") is False, "service account token automount must be disabled")
     sc = container["securityContext"]
     assert_true(sc.get("allowPrivilegeEscalation") is False, "privilege escalation must be disabled")
@@ -41,13 +42,15 @@ def main() -> None:
     assert_true(pod.get("securityContext", {}).get("runAsNonRoot") is True, "pod must require non-root")
 
     kinds = {item.get("kind") for item in manifest}
-    assert_true("NetworkPolicy" in kinds, "production deployment must include NetworkPolicy")
-    assert_true("ServiceAccount" in kinds, "production deployment must include dedicated ServiceAccount")
+    assert_true("NetworkPolicy" in kinds, "deployment must include NetworkPolicy")
+    assert_true("ServiceAccount" in kinds, "deployment must include dedicated ServiceAccount")
 
-    policy_files = list((ROOT / "deploy/kubernetes").glob("*.yaml"))
-    for path in policy_files:
-        text = path.read_text(encoding="utf-8")
-        assert_true("imagePullPolicy: Always" in text or path.name != "deployment.yaml", "production image pulls must not use stale cached images")
+    template = (ROOT / "deploy/kubernetes/production/deployment.template.yaml").read_text(encoding="utf-8")
+    assert_true("${THREATFADE_IMAGE}" in template, "production template must require an injected image")
+    assert_true("imagePullPolicy: Always" in template, "production template must always pull the selected digest")
+
+    renderer = (ROOT / "scripts/render_production_manifest.py").read_text(encoding="utf-8")
+    assert_true("@sha256:[0-9a-f]{64}" in renderer, "production renderer must enforce digest syntax")
 
     print("Group 7 supply-chain and runtime security gate: OK")
 
