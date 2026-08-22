@@ -68,7 +68,9 @@ jobs:
         id: base
         shell: bash
         run: |
-          digest="$(docker buildx imagetools inspect "python:${PYTHON_BASE_TAG}" | awk '/^Digest:/ {print $2; exit}')"
+          docker pull "python:${PYTHON_BASE_TAG}"
+          ref="$(docker image inspect "python:${PYTHON_BASE_TAG}" --format '{{index .RepoDigests 0}}')"
+          digest="${ref##*@}"
           [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid base digest: $digest"; exit 1; }
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
       - name: Build production container
@@ -128,7 +130,7 @@ jobs:
               conn.execute(text("GRANT CONNECT ON DATABASE threatfade TO threatfade_app"))
               conn.execute(text("GRANT USAGE ON SCHEMA public TO threatfade_app"))
               conn.execute(text("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO threatfade_app"))
-              conn.execute(text("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO threatfade_app"))
+              conn.execute(text("GRANT USAGE, SELECT ON ALL SEQUENCES TO threatfade_app"))
           print('least-privileged application role: OK')
           PY
       - name: Validate PostgreSQL integrity and tenant isolation as application role
