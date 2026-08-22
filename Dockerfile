@@ -1,20 +1,28 @@
-FROM python:3.12-slim
+# syntax=docker/dockerfile:1
+FROM python:3.12.13-slim-bookworm@sha256:a116514e19457bcb7af7efe9c3dd0b9b71e85b317694e7882a1c52aa15a78134
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+LABEL org.opencontainers.image.source="https://github.com/LloydCoder/tinlance-threatfade" \
+      org.opencontainers.image.title="ThreatFade" \
+      org.opencontainers.image.description="Open-core network threat detection oracle" \
+      org.opencontainers.image.licenses="Apache-2.0"
 
 RUN addgroup --system threatfade && adduser --system --ingroup threatfade threatfade
 WORKDIR /app
 
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --disable-pip-version-check -r requirements.txt
 COPY . .
 
 RUN mkdir -p /app/reports /app/tmp && chown -R threatfade:threatfade /app
 USER threatfade
 
 EXPOSE 8080
+STOPSIGNAL SIGTERM
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3).read()"
 
 CMD ["uvicorn", "enterprise_app:app", "--host", "0.0.0.0", "--port", "8080", "--timeout-graceful-shutdown", "25"]
