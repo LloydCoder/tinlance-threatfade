@@ -2,14 +2,13 @@
 
 The module deliberately keeps feature extraction deterministic and explainable.
 It operates on ordered signal observations and does not require decryption or
-external services.  It provides temporal, baseline and beaconing evidence that
+external services. It provides temporal, baseline and beaconing evidence that
 can be combined with the existing entropy/z-score detector.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from math import isfinite
-from statistics import median
 from typing import Iterable, Mapping, Sequence
 
 import numpy as np
@@ -126,11 +125,8 @@ def extract_temporal_features(
     x_centered = x - float(np.mean(x))
     denom = float(np.dot(x_centered, x_centered))
     slope = float(np.dot(x_centered, arr - mean) / denom) if denom > EPSILON else 0.0
-    residual = arr - (mean + slope * x_centered)
-    residual_std = float(np.std(residual))
     slope_zscore = float(abs(slope) * np.std(x) / max(std, EPSILON))
 
-    # A simple deterministic change point: maximum standardized mean shift.
     change_point_index = -1
     best_change = 0.0
     if n >= 8:
@@ -235,8 +231,9 @@ class AdaptiveBaseline:
     def evidence(self, value: float) -> BaselineEvidence:
         if self.mean is None:
             return BaselineEvidence(0.0, 0.0, 0.0, 0.0, 0)
+        difference = abs(float(value) - self.mean)
         robust_scale = max(self.std, EPSILON)
-        z = abs(float(value) - self.mean) / robust_scale if self.std > EPSILON else 0.0
+        z = difference / robust_scale
         score = float(min(1.0, z / 4.0)) if self.support >= self.min_support else 0.0
         return BaselineEvidence(float(self.mean), self.std, float(z), score, self.support)
 
@@ -257,12 +254,14 @@ def behavioral_evidence(
     persistence = float(np.clip(temporal.longest_low_run / max(temporal.sample_count * 0.5, 1), 0.0, 1.0))
     recovery = float(np.clip(temporal.recovery_ratio, 0.0, 1.0))
     periodicity = float(beacon.periodicity_score if beacon else 0.0)
+    # Periodicity is contextual evidence only when a fade/change signal exists.
+    periodicity_context = periodicity * max(sustained_drop, change, persistence)
     return {
         "sustained_drop": sustained_drop,
         "change_point": change,
         "persistence": persistence,
         "recovery": recovery,
-        "periodicity": periodicity,
+        "periodicity": periodicity_context,
     }
 
 
@@ -275,7 +274,7 @@ def combine_evidence(
 ) -> tuple[float, dict[str, float]]:
     """Combine independent evidence into a bounded, explainable score.
 
-    The output is an anomaly score, not a calibrated probability.  ML is capped
+    The output is an anomaly score, not a calibrated probability. ML is capped
     so a model cannot override strong contradictory deterministic evidence.
     """
     components = {
@@ -288,7 +287,6 @@ def combine_evidence(
         "periodicity": float(np.clip(behavioral.get("periodicity", 0.0), 0.0, 1.0)),
         "ml": float(np.clip(ml_score, 0.0, 1.0)),
     }
-    # Deterministic evidence remains dominant; recovery is context, not threat evidence.
     score = (
         0.30 * components["rule"]
         + 0.18 * components["baseline"]
