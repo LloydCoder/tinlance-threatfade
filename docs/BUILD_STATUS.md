@@ -36,7 +36,7 @@ ThreatFade separates three recovery mechanisms:
 2. **Portable `pg_dump` custom-format backups** for logical portability, migration and disaster recovery.
 3. **Isolated restore drills** that verify an artifact can actually produce a usable PostgreSQL database.
 
-PostgreSQL's current documentation treats SQL dumps, file-system-level backups and continuous archiving as distinct backup approaches. `pg_verifybackup` can detect many base-backup integrity problems, but PostgreSQL explicitly states that verification does not replace test restores. urlPostgreSQL Backup and Restore documentationhttps://www.postgresql.org/docs/current/backup.html urlPostgreSQL pg_verifybackup documentationhttps://www.postgresql.org/docs/current/app-pgverifybackup.html
+PostgreSQL's current documentation treats SQL dumps, file-system-level backups and continuous archiving as distinct backup approaches. `pg_verifybackup` can detect many base-backup integrity problems, but PostgreSQL explicitly states that verification does not replace test restores.
 
 ### Group 6 acceptance gate
 
@@ -47,7 +47,7 @@ PostgreSQL's current documentation treats SQL dumps, file-system-level backups a
 - [x] Backup catalog is verified before acceptance.
 - [x] Credentials are passed through environment state rather than database URLs in process arguments.
 - [x] Restore occurs in an isolated database during CI.
-- [x] Alembic migration head is verified after restore.
+- [x] Current Alembic migration head is resolved dynamically and verified after restore.
 - [x] Required enterprise tables are verified after restore.
 - [x] Forced PostgreSQL RLS is verified after restore.
 - [x] Backup and restore artifacts are never committed to the repository.
