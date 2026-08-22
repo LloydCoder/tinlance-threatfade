@@ -2,6 +2,33 @@
 
 All notable changes to ThreatFade will be documented in this file.
 
+## [0.7.0] – 2026-08-22
+
+### Secure Deployment, Supply Chain & Production Operations
+
+#### Added
+- Digest-pinned Python base container image with OCI source metadata.
+- Build-context exclusions for source control metadata, local environments, recovery artifacts and temporary files.
+- Mandatory SHA-pinned GitHub Actions across CI/security/supply-chain workflows.
+- SPDX SBOM generation and vulnerability scanning for the production container.
+- Trivy Dockerfile/Kubernetes configuration scanning.
+- Main-branch GHCR publication using commit-derived immutable image tags.
+- OIDC-backed GitHub artifact attestations for SLSA build provenance.
+- Signed SPDX SBOM attestations attached to the released image digest.
+- Kubernetes dedicated service account with token automount disabled.
+- Kubernetes read-only root filesystem, dropped capabilities, non-root execution, seccomp and no privilege escalation.
+- Isolated writable `emptyDir` mounts for application report/tmp paths.
+- Kubernetes NetworkPolicy baseline and production image pull policy.
+- Fail-closed production digest renderer requiring `@sha256:<64-hex>` image references.
+- Supply-chain architecture acceptance validator integrated into core CI.
+- Secure deployment and release-gate documentation.
+
+#### Operational notes
+- Pull requests build and scan without package-write or attestation privileges.
+- Main-branch publication requires the complete test/security/supply-chain pipeline to pass first.
+- Production promotion must use the rendered digest-pinned manifest; the generic deployment manifest is not the final release artifact.
+- External secret-management integration remains an infrastructure responsibility and must bind runtime credentials through Kubernetes Secrets or an approved external-secrets implementation.
+
 ## [0.6.0] – 2026-08-22
 
 ### Disaster Recovery, Backup & Operational Continuity
@@ -36,11 +63,6 @@ All notable changes to ThreatFade will be documented in this file.
 - Reliability acceptance script and regression tests.
 - Kubernetes startup/readiness/liveness probes, safe rolling updates, topology spread and PodDisruptionBudget.
 - Container healthcheck now tests liveness independently of backend readiness.
-
-#### Operational notes
-- Readiness returns `503` when required storage is unavailable or the application is draining.
-- Resilience controls fail closed rather than silently discarding detection work.
-- Metrics intentionally avoid tenant/user identifiers as labels to prevent high-cardinality telemetry.
 
 ## [1.0.0-beta] – 2026-03-09
 

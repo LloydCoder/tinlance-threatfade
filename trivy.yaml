@@ -1,0 +1,17 @@
+scan:
+  scanners:
+    - vuln
+    - secret
+    - misconfig
+vulnerability:
+  type:
+    - os
+    - library
+  ignore-unfixed: true
+  severity:
+    - CRITICAL
+    - HIGH
+misconfiguration:
+  include-non-failures: false
+exit-code: 1
+format: table

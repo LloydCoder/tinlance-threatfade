@@ -13,6 +13,9 @@ concurrency:
   group: threatfade-ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  PYTHON_BASE_TAG: 3.12.14-slim-trixie
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -41,6 +44,8 @@ jobs:
         run: python -m compileall -q .
       - name: Validate security architecture baseline
         run: python scripts/validate_security_architecture.py
+      - name: Validate supply-chain architecture
+        run: python scripts/validate_supply_chain.py
       - name: Validate ground-truth corpus contract
         run: python scripts/validate_ground_truth.py
       - name: Validate reliability architecture
@@ -59,8 +64,17 @@ jobs:
           python -c "from tests.test_detection_pack_platform import manifest; from core.detection_pack_platform import validate_manifest; validate_manifest(manifest()); print('pack manifest: OK')"
       - name: Enterprise and dashboard smoke checks
         run: python scripts/enterprise_smoke.py
+      - name: Resolve current Python base digest
+        id: base
+        shell: bash
+        run: |
+          docker pull "python:${PYTHON_BASE_TAG}"
+          ref="$(docker image inspect "python:${PYTHON_BASE_TAG}" --format '{{index .RepoDigests 0}}')"
+          digest="${ref##*@}"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid base digest: $digest"; exit 1; }
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
       - name: Build production container
-        run: docker build --pull -t threatfade:ci .
+        run: docker build --pull --build-arg PYTHON_BASE_TAG="$PYTHON_BASE_TAG" --build-arg PYTHON_BASE_DIGEST="${{ steps.base.outputs.digest }}" -t threatfade:ci .
 
   postgres-integrity:
     runs-on: ubuntu-latest

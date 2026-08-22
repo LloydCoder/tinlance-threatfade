@@ -29,13 +29,14 @@ def main() -> None:
     assert breaker.state == "open"
 
     manifest = list(yaml.safe_load_all(Path("deploy/kubernetes/deployment.yaml").read_text(encoding="utf-8")))
-    deployment = manifest[0]
+    deployment = next(item for item in manifest if item.get("kind") == "Deployment")
+    pdb = next(item for item in manifest if item.get("kind") == "PodDisruptionBudget")
     container = deployment["spec"]["template"]["spec"]["containers"][0]
     assert container["startupProbe"]["httpGet"]["path"] == "/healthz"
     assert container["livenessProbe"]["httpGet"]["path"] == "/healthz"
     assert container["readinessProbe"]["httpGet"]["path"] == "/ready"
     assert deployment["spec"]["strategy"]["rollingUpdate"]["maxUnavailable"] == 0
-    assert manifest[2]["kind"] == "PodDisruptionBudget"
+    assert pdb["spec"]["minAvailable"] == 1
     print("Group 5 reliability gate: OK")
 
 
