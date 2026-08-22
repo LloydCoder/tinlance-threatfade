@@ -47,7 +47,7 @@ def create_backup(output_dir: Path) -> Path:
         "created_at": datetime.now(timezone.utc).isoformat(),
         "sha256": digest,
         "size_bytes": archive.stat().st_size,
-        "postgresql_major": os.environ.get("THREATFARE_POSTGRES_MAJOR", os.environ.get("THREATFADE_POSTGRES_MAJOR", "unknown")),
+        "postgresql_major": os.environ.get("THREATFADE_POSTGRES_MAJOR", "unknown"),
         "migration_head": os.environ.get("THREATFADE_MIGRATION_HEAD", "unknown"),
         "archive": archive.name,
     }
