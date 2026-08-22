@@ -1,0 +1,56 @@
+"""Static acceptance gate for Group 7 supply-chain controls."""
+from __future__ import annotations
+
+from pathlib import Path
+import re
+import yaml
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def assert_true(condition: bool, message: str) -> None:
+    if not condition:
+        raise AssertionError(message)
+
+
+def main() -> None:
+    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    assert_true(re.search(r"^FROM\s+\S+@sha256:[0-9a-f]{64}\s*$", dockerfile, re.M) is not None, "Docker base image must be digest pinned")
+    assert_true("USER threatfade" in dockerfile, "container must run as non-root")
+    assert_true("org.opencontainers.image.source" in dockerfile, "OCI source label required")
+    assert_true("HEALTHCHECK" in dockerfile, "container healthcheck required")
+
+    workflow_dir = ROOT / ".github" / "workflows"
+    workflow_text = "\n".join(p.read_text(encoding="utf-8") for p in workflow_dir.glob("*.yml"))
+    action_refs = re.findall(r"uses:\s*([^\s]+)@([^\s]+)", workflow_text)
+    unpinned = [f"{name}@{ref}" for name, ref in action_refs if not re.fullmatch(r"[0-9a-f]{40}", ref)]
+    assert_true(not unpinned, f"all third-party GitHub Actions must be SHA pinned: {unpinned}")
+
+    manifest = list(yaml.safe_load_all((ROOT / "deploy/kubernetes/deployment.yaml").read_text(encoding="utf-8")))
+    deployment = next(item for item in manifest if item.get("kind") == "Deployment")
+    pod = deployment["spec"]["template"]["spec"]
+    container = pod["containers"][0]
+    image = container["image"]
+    assert_true("@sha256:" in image, "production Kubernetes image must be digest pinned")
+    assert_true(":latest" not in image, "latest image tag is forbidden")
+    assert_true(pod.get("automountServiceAccountToken") is False, "service account token automount must be disabled")
+    sc = container["securityContext"]
+    assert_true(sc.get("allowPrivilegeEscalation") is False, "privilege escalation must be disabled")
+    assert_true(sc.get("readOnlyRootFilesystem") is True, "root filesystem must be read-only")
+    assert_true(set(sc.get("capabilities", {}).get("drop", [])) == {"ALL"}, "all Linux capabilities must be dropped")
+    assert_true(pod.get("securityContext", {}).get("runAsNonRoot") is True, "pod must require non-root")
+
+    kinds = {item.get("kind") for item in manifest}
+    assert_true("NetworkPolicy" in kinds, "production deployment must include NetworkPolicy")
+    assert_true("ServiceAccount" in kinds, "production deployment must include dedicated ServiceAccount")
+
+    policy_files = list((ROOT / "deploy/kubernetes").glob("*.yaml"))
+    for path in policy_files:
+        text = path.read_text(encoding="utf-8")
+        assert_true("imagePullPolicy: Always" in text or path.name != "deployment.yaml", "production image pulls must not use stale cached images")
+
+    print("Group 7 supply-chain and runtime security gate: OK")
+
+
+if __name__ == "__main__":
+    main()
