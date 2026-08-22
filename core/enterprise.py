@@ -1,17 +1,41 @@
-"""Enterprise identity, tenancy, authorization, audit and SLO primitives."""
+"""Enterprise identity, tenancy, authorization, audit and SLO primitives.
+
+Security boundary rules:
+- Production authentication is OIDC/JWT only.
+- JWTs are accepted only with an explicitly allowed asymmetric RSA algorithm.
+- The tenant in the authenticated token is authoritative; an X-Tenant-ID header
+  may only repeat that tenant and can never override it.
+- ``admin`` is tenant-scoped. Cross-tenant access requires an explicit
+  ``global_admin`` claim so an ordinary tenant administrator cannot become a
+  platform administrator by changing a header.
+- Development authentication is intentionally permissive but is never enabled
+  by production configuration.
+"""
 from __future__ import annotations
-import json, os, time, uuid
+
+import ipaddress
+import json
+import os
+import re
+import time
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Set
+
 import requests
 from fastapi import HTTPException, Request
+
 try:
     import jwt
-except ImportError:
+except ImportError:  # pragma: no cover - dependency gate is covered by CI
     jwt = None
 
 ROLES = {"viewer", "analyst", "admin", "tenant_admin", "api_only"}
+ALLOWED_JWT_ALGORITHMS = {"RS256", "RS384", "RS512"}
+TENANT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,254}$")
+SUBJECT_RE = re.compile(r"^.{1,255}$", re.DOTALL)
+
 ROLE_PERMISSIONS = {
     "viewer": {"detection:read", "case:read"},
     "analyst": {"detection:read", "detection:run", "case:read", "case:write", "export:write"},
@@ -19,6 +43,12 @@ ROLE_PERMISSIONS = {
     "admin": {"*"},
     "tenant_admin": {"detection:read", "detection:run", "case:read", "case:write", "export:write"},
 }
+
+
+def _validated_identifier(value: Any, *, field: str, pattern: re.Pattern[str]) -> str:
+    if not isinstance(value, str) or not pattern.fullmatch(value):
+        raise HTTPException(403, f"Token has invalid {field}")
+    return value
 
 
 @dataclass(frozen=True)
@@ -29,11 +59,30 @@ class Principal:
     scopes: Set[str] = field(default_factory=set)
     claims: Dict[str, Any] = field(default_factory=dict)
 
+    @property
+    def is_global_admin(self) -> bool:
+        value = self.claims.get("global_admin")
+        if value is None:
+            value = self.claims.get("https://tinlance.com/global_admin")
+        return value is True
+
+    @property
+    def auth_method(self) -> str:
+        return str(self.claims.get("auth_method", "oidc"))
+
     def can(self, permission: str) -> bool:
-        return "*" in self.scopes or any(permission in ROLE_PERMISSIONS.get(role, set()) or "*" in ROLE_PERMISSIONS.get(role, set()) for role in self.roles)
+        if "*" in self.scopes or permission in self.scopes:
+            return True
+        return any(
+            permission in ROLE_PERMISSIONS.get(role, set())
+            or "*" in ROLE_PERMISSIONS.get(role, set())
+            for role in self.roles
+        )
 
 
 class OIDCValidator:
+    """Strict OIDC JWT validator with bounded JWKS caching and key rotation retry."""
+
     def __init__(self):
         self.issuer = os.getenv("THREATFADE_OIDC_ISSUER", "").rstrip("/")
         self.audience = os.getenv("THREATFADE_OIDC_AUDIENCE", "")
@@ -42,51 +91,98 @@ class OIDCValidator:
         self._jwks_at = 0.0
 
     @property
-    def configured(self):
+    def configured(self) -> bool:
         return bool(self.issuer and self.audience and (self.jwks_url or self.issuer))
 
     def _load_jwks(self):
         if self._jwks and time.monotonic() - self._jwks_at < 300:
             return self._jwks
-        response = requests.get(self.jwks_url or f"{self.issuer}/.well-known/jwks.json", timeout=5)
+        response = requests.get(
+            self.jwks_url or f"{self.issuer}/.well-known/jwks.json",
+            timeout=(2, 5),
+            allow_redirects=False,
+        )
         response.raise_for_status()
-        self._jwks = response.json()
+        payload = response.json()
+        if not isinstance(payload, dict) or not isinstance(payload.get("keys"), list):
+            raise ValueError("invalid JWKS document")
+        self._jwks = payload
         self._jwks_at = time.monotonic()
-        return self._jwks
+        return payload
 
-    def validate(self, token):
+    def _key_for_token(self, token: str):
+        header = jwt.get_unverified_header(token)
+        if not isinstance(header, dict):
+            raise ValueError("invalid JWT header")
+        algorithm = header.get("alg")
+        if algorithm not in ALLOWED_JWT_ALGORITHMS:
+            raise ValueError("unsupported JWT algorithm")
+        kid = header.get("kid")
+        if not isinstance(kid, str) or not kid or len(kid) > 255:
+            raise ValueError("missing or invalid key id")
+        keys = self._load_jwks().get("keys", [])
+        key = next((item for item in keys if item.get("kid") == kid), None)
+        if not key:
+            self._jwks = None
+            keys = self._load_jwks().get("keys", [])
+            key = next((item for item in keys if item.get("kid") == kid), None)
+        if not key or key.get("kty") != "RSA":
+            raise ValueError("unknown or unsupported signing key")
+        if key.get("use") not in (None, "sig"):
+            raise ValueError("JWKS key is not a signing key")
+        if key.get("alg") not in (None, algorithm):
+            raise ValueError("JWKS algorithm mismatch")
+        return algorithm, jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(key))
+
+    def validate(self, token: str) -> Principal:
         if not self.configured:
             raise HTTPException(503, "OIDC is not configured")
         if jwt is None:
             raise HTTPException(503, "PyJWT is required for OIDC authentication")
+        if not isinstance(token, str) or not token or len(token) > 16384:
+            raise HTTPException(401, "Invalid OIDC access token")
         try:
-            header = jwt.get_unverified_header(token)
-            kid = header.get("kid")
-            key = next((item for item in self._load_jwks().get("keys", []) if item.get("kid") == kid), None)
-            if not key:
-                self._jwks = None
-                key = next((item for item in self._load_jwks().get("keys", []) if item.get("kid") == kid), None)
-            if not key:
-                raise ValueError("unknown signing key")
-            if key.get("kty") != "RSA":
-                raise ValueError("unsupported signing key type")
-            public_key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(key))
+            algorithm, public_key = self._key_for_token(token)
             claims = jwt.decode(
                 token,
                 public_key,
-                algorithms=["RS256", "RS384", "RS512"],
+                algorithms=[algorithm],
                 audience=self.audience,
                 issuer=self.issuer,
-                options={"require": ["exp", "iat", "sub"]},
+                options={
+                    "require": ["exp", "iat", "sub", "iss", "aud"],
+                    "verify_signature": True,
+                    "verify_exp": True,
+                    "verify_iat": True,
+                    "verify_iss": True,
+                    "verify_aud": True,
+                },
+                leeway=int(os.getenv("THREATFADE_OIDC_CLOCK_SKEW_SECONDS", "30")),
             )
         except Exception as exc:
             raise HTTPException(401, "Invalid OIDC access token") from exc
-        roles = (set(claims.get("roles", [])) | set(claims.get("https://tinlance.com/roles", []))) & ROLES
-        scopes = set(str(claims.get("scope", "")).split())
+
+        subject = _validated_identifier(claims.get("sub"), field="subject", pattern=SUBJECT_RE)
         tenant = claims.get("tenant_id") or claims.get("https://tinlance.com/tenant_id")
-        if not tenant:
-            raise HTTPException(403, "Token has no tenant_id claim")
-        return Principal(str(claims["sub"]), str(tenant), roles, scopes, claims)
+        tenant = _validated_identifier(tenant, field="tenant_id", pattern=TENANT_RE)
+
+        raw_roles = claims.get("roles", [])
+        if raw_roles is None:
+            raw_roles = []
+        if not isinstance(raw_roles, list) or not all(isinstance(role, str) for role in raw_roles):
+            raise HTTPException(403, "Token has invalid roles claim")
+        namespaced_roles = claims.get("https://tinlance.com/roles", [])
+        if namespaced_roles is None:
+            namespaced_roles = []
+        if not isinstance(namespaced_roles, list) or not all(isinstance(role, str) for role in namespaced_roles):
+            raise HTTPException(403, "Token has invalid roles claim")
+        roles = (set(raw_roles) | set(namespaced_roles)) & ROLES
+
+        raw_scope = claims.get("scope", "")
+        if not isinstance(raw_scope, str) or len(raw_scope) > 4096:
+            raise HTTPException(403, "Token has invalid scope claim")
+        scopes = {scope for scope in raw_scope.split() if scope}
+        return Principal(subject, tenant, roles, scopes, claims)
 
 
 OIDC = OIDCValidator()
@@ -94,13 +190,25 @@ OIDC = OIDCValidator()
 
 def authenticate(request: Request, api_key: Optional[str] = None) -> Principal:
     authorization = request.headers.get("Authorization", "")
-    if authorization.startswith("Bearer "):
-        return OIDC.validate(authorization[7:].strip())
+    if authorization:
+        scheme, _, credentials = authorization.partition(" ")
+        if scheme.lower() != "bearer" or not credentials.strip():
+            raise HTTPException(401, "Bearer authentication required")
+        return OIDC.validate(credentials.strip())
+
     if os.getenv("THREATFADE_ENV", "development").lower() != "production":
         configured = os.getenv("THREATFADE_API_KEY")
         if configured and api_key == configured:
-            return Principal("api-key", request.headers.get("X-Tenant-ID", "local"), {"api_only"})
-        return Principal("local-development", request.headers.get("X-Tenant-ID", "local"), {"admin"})
+            tenant = request.headers.get("X-Tenant-ID", "local")
+            if not TENANT_RE.fullmatch(tenant):
+                raise HTTPException(400, "Invalid tenant identifier")
+            return Principal("api-key", tenant, {"api_only"}, claims={"auth_method": "api_key"})
+        if os.getenv("THREATFADE_ALLOW_DEV_AUTH", "true").lower() == "true":
+            tenant = request.headers.get("X-Tenant-ID", "local")
+            if not TENANT_RE.fullmatch(tenant):
+                raise HTTPException(400, "Invalid tenant identifier")
+            return Principal("local-development", tenant, {"admin"}, claims={"auth_method": "development", "global_admin": False})
+
     raise HTTPException(401, "Bearer OIDC token required in production")
 
 
@@ -111,8 +219,12 @@ def authorize(principal: Principal, permission: str):
 
 def require_tenant(principal: Principal, tenant_id: Optional[str]) -> str:
     requested = tenant_id or principal.tenant_id
-    # Only the global admin role may intentionally cross tenant boundaries.
-    if requested != principal.tenant_id and "admin" not in principal.roles:
+    if not TENANT_RE.fullmatch(requested):
+        raise HTTPException(400, "Invalid tenant identifier")
+    # A supplied tenant header/body field is a consistency assertion, never an
+    # impersonation mechanism. Only an explicitly delegated global admin can
+    # cross tenant boundaries.
+    if requested != principal.tenant_id and not principal.is_global_admin:
         raise HTTPException(403, "Cross-tenant access denied")
     return requested
 
@@ -124,7 +236,21 @@ class AuditLogger:
         if directory:
             os.makedirs(directory, exist_ok=True)
 
-    def record(self, action, principal: Principal, request: Optional[Request] = None, metadata: Optional[Dict[str, Any]] = None):
+    def record(
+        self,
+        action,
+        principal: Principal,
+        request: Optional[Request] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ):
+        client_ip = request.client.host if request and request.client else None
+        # Never trust forwarded client IP headers at this layer; a trusted proxy
+        # may add its own normalized identity before the request reaches us.
+        try:
+            if client_ip:
+                ipaddress.ip_address(client_ip)
+        except ValueError:
+            client_ip = None
         event = {
             "event_id": str(uuid.uuid4()),
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -133,7 +259,8 @@ class AuditLogger:
             "tenant_id": principal.tenant_id,
             "roles": sorted(principal.roles),
             "request_id": request.headers.get("X-Request-ID") if request else None,
-            "source_ip": request.client.host if request and request.client else None,
+            "source_ip": client_ip,
+            "auth_method": principal.auth_method,
             "metadata": metadata or {},
         }
         with open(self.path, "a", encoding="utf-8") as handle:
