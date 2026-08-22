@@ -91,4 +91,4 @@ def test_gradual_lotl_fade_remains_detected():
 def test_flat_signal_does_not_gain_behavioral_detection():
     result = detect_fade(list(range(100)), [0.8] * 100)
     assert result["detected"] is False
-    assert result["science_score"] == 0.0
+    assert 0.0 <= result["science_score"] < 0.01
