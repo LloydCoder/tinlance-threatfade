@@ -12,6 +12,9 @@ concurrency:
   group: threatfade-release-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  PYTHON_BASE_TAG: 3.12.14-slim-trixie
+
 jobs:
   release:
     runs-on: ubuntu-24.04
@@ -35,6 +38,13 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve current Python base digest
+        id: base
+        shell: bash
+        run: |
+          digest="$(docker buildx imagetools inspect "python:${PYTHON_BASE_TAG}" | awk '/^Digest:/ {print $2; exit}')"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid base digest: $digest"; exit 1; }
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
       - name: Build and push immutable image
         id: image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
@@ -42,6 +52,9 @@ jobs:
           context: .
           push: true
           tags: ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+          build-args: |
+            PYTHON_BASE_TAG=${{ env.PYTHON_BASE_TAG }}
+            PYTHON_BASE_DIGEST=${{ steps.base.outputs.digest }}
           provenance: mode=max
           sbom: true
           labels: |
