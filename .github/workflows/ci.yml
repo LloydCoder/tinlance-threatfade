@@ -46,6 +46,8 @@ jobs:
         run: python scripts/validate_security_architecture.py
       - name: Validate identity and tenant security architecture
         run: python scripts/validate_identity_architecture.py
+      - name: Validate detection science architecture
+        run: python scripts/validate_detection_science.py
       - name: Validate supply-chain architecture
         run: python scripts/validate_supply_chain.py
       - name: Validate ground-truth corpus contract
