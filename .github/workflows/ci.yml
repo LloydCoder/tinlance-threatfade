@@ -130,7 +130,7 @@ jobs:
               conn.execute(text("GRANT CONNECT ON DATABASE threatfade TO threatfade_app"))
               conn.execute(text("GRANT USAGE ON SCHEMA public TO threatfade_app"))
               conn.execute(text("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO threatfade_app"))
-              conn.execute(text("GRANT USAGE, SELECT ON ALL SEQUENCES TO threatfade_app"))
+              conn.execute(text("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO threatfade_app"))
           print('least-privileged application role: OK')
           PY
       - name: Validate PostgreSQL integrity and tenant isolation as application role
