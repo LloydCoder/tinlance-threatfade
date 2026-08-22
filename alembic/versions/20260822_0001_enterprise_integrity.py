@@ -23,13 +23,12 @@ RLS_TABLES = (
 
 def upgrade() -> None:
     bind = op.get_bind()
-    # Metadata is the single source of truth for the ORM schema; Alembic owns when
-    # that schema is installed in production. This avoids application startup DDL.
     Base.metadata.create_all(bind=bind)
     if bind.dialect.name != "postgresql":
         return
     for table in RLS_TABLES:
         op.execute(f'ALTER TABLE "{table}" ENABLE ROW LEVEL SECURITY')
+        op.execute(f'ALTER TABLE "{table}" FORCE ROW LEVEL SECURITY')
         op.execute(f'DROP POLICY IF EXISTS "{table}_tenant_isolation" ON "{table}"')
         op.execute(
             f'CREATE POLICY "{table}_tenant_isolation" ON "{table}" '
@@ -47,6 +46,7 @@ def downgrade() -> None:
     if bind.dialect.name == "postgresql":
         for table in reversed(RLS_TABLES):
             op.execute(f'DROP POLICY IF EXISTS "{table}_tenant_isolation" ON "{table}"')
+            op.execute(f'ALTER TABLE "{table}" NO FORCE ROW LEVEL SECURITY')
             op.execute(f'ALTER TABLE "{table}" DISABLE ROW LEVEL SECURITY')
     inspector = inspect(bind)
     for table in reversed(list(Base.metadata.tables)):
