@@ -41,9 +41,9 @@
 - The ordinary `admin` role is tenant-scoped.
 - Cross-tenant access requires an explicit `global_admin=true` claim.
 
-### Service identity
+### Service-to-service boundary
 
-A dedicated `require_service_principal()` primitive defines the intended service-to-service boundary: a caller must present an OIDC principal with `token_use=service` and the least-privilege `api_only` role before a service-only endpoint may be exposed.
+No current production endpoint requires a machine-only principal. The Group 8 boundary therefore does not advertise an unexercised service-token contract. When service-only endpoints are introduced, they must use short-lived OIDC service identities with explicit least-privilege authorization rather than inheriting human administrator privileges.
 
 ## Regression coverage
 
@@ -62,7 +62,9 @@ A dedicated `require_service_principal()` primitive defines the intended service
 - unknown signing keys
 - HS256 rejection
 
-`scripts/validate_identity_architecture.py` provides a deterministic CI architecture gate against accidental removal of the production OIDC boundary, tenant isolation rule, RSA algorithm allow-list, issuer/audience verification, bounded JWKS retrieval and service-identity primitive.
+`test_enterprise.py` also enforces that the `admin` role alone cannot cross tenant boundaries; cross-tenant administration requires the explicit `global_admin=true` claim.
+
+`scripts/validate_identity_architecture.py` provides a deterministic CI architecture gate against accidental removal of the production OIDC boundary, tenant isolation rule, RSA algorithm allow-list, issuer/audience verification and bounded JWKS retrieval.
 
 ## Verification boundary
 

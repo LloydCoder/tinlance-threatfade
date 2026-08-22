@@ -21,7 +21,7 @@ def test_analyst_can_run_detection():
 
 
 def test_cross_tenant_isolation():
-    for role in ("analyst", "tenant_admin"):
+    for role in ("analyst", "tenant_admin", "admin"):
         with pytest.raises(HTTPException) as exc:
             require_tenant(Principal("u", "tenant-a", {role}), "tenant-b")
         assert exc.value.status_code == 403
@@ -31,5 +31,6 @@ def test_tenant_admin_can_access_own_tenant_only():
     assert require_tenant(Principal("u", "tenant-a", {"tenant_admin"}), "tenant-a") == "tenant-a"
 
 
-def test_global_admin_can_access_managed_tenant():
-    assert require_tenant(Principal("u", "tenant-a", {"admin"}), "tenant-b") == "tenant-b"
+def test_global_admin_requires_explicit_claim():
+    principal = Principal("u", "tenant-a", {"admin"}, claims={"global_admin": True})
+    assert require_tenant(principal, "tenant-b") == "tenant-b"
