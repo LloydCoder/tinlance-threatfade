@@ -1,0 +1,58 @@
+name: ThreatFade Group 10 Validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: threatfade-group10-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Compile sources
+        run: python -m compileall -q core benchmarks scripts tests
+      - name: Corpus governance gate
+        run: python scripts/validate_corpus_architecture.py
+      - name: Group 10 evaluation gate
+        run: python scripts/validate_group10.py
+      - name: Purple-team matrix gate
+        run: python benchmarks/purple_team_harness.py
+      - name: Group 10 tests
+        run: pytest -q tests/test_corpus.py tests/test_evaluation.py tests/test_evaluation_corpus.py tests/test_evaluation_governance.py tests/test_group10_validation.py
+      - name: Reproducibility check
+        run: |
+          python benchmarks/group10_validation.py > /tmp/group10-a.json
+          python benchmarks/group10_validation.py > /tmp/group10-b.json
+          python - <<'PY'
+          import json
+          a=json.load(open('/tmp/group10-a.json'))
+          b=json.load(open('/tmp/group10-b.json'))
+          a['benchmark']['elapsed_seconds']=0
+          b['benchmark']['elapsed_seconds']=0
+          assert a == b, 'Group 10 benchmark is not deterministic'
+          print('reproducibility: OK')
+          PY
