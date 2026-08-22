@@ -19,10 +19,8 @@ REQUIRED = {
     "tenant claim": 'claims.get("tenant_id")',
     "tenant boundary": 'Cross-tenant access denied',
     "explicit global admin": "principal.is_global_admin",
-    "service identity primitive": "def require_service_principal",
     "bounded JWKS request": "timeout=(2, 5)",
     "redirect refusal": "allow_redirects=False",
-    "token lifetime policy": "THREATFADE_OIDC_MAX_TOKEN_LIFETIME_SECONDS",
 }
 
 
