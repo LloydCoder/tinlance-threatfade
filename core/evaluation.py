@@ -9,7 +9,6 @@ import numpy as np
 
 @dataclass(frozen=True)
 class EvaluationCase:
-    """One labeled detector evaluation case."""
     case_id: str
     scenario: str
     expected_detection: bool
@@ -57,33 +56,11 @@ def classification_metrics(matrix: ConfusionMatrix) -> dict:
     accuracy = _safe_div(tp + tn, matrix.total)
     fpr = _safe_div(fp, fp + tn)
     fnr = _safe_div(fn, fn + tp)
-    balanced_accuracy = (recall + specificity) / 2.0
-    return {
-        "support": matrix.total,
-        "positive_support": tp + fn,
-        "negative_support": tn + fp,
-        "true_positive": tp,
-        "false_positive": fp,
-        "true_negative": tn,
-        "false_negative": fn,
-        "accuracy": accuracy,
-        "precision": precision,
-        "recall": recall,
-        "sensitivity": recall,
-        "specificity": specificity,
-        "f1": f1,
-        "false_positive_rate": fpr,
-        "false_negative_rate": fnr,
-        "balanced_accuracy": balanced_accuracy,
-    }
+    return {"support": matrix.total, "positive_support": tp + fn, "negative_support": tn + fp, "true_positive": tp, "false_positive": fp, "true_negative": tn, "false_negative": fn, "accuracy": accuracy, "precision": precision, "recall": recall, "sensitivity": recall, "specificity": specificity, "f1": f1, "false_positive_rate": fpr, "false_negative_rate": fnr, "balanced_accuracy": (recall + specificity) / 2.0}
 
 
 def ranking_metrics(cases: Sequence[EvaluationCase]) -> dict:
-    """Compute AUROC/AUPRC from detector scores without an ML dependency.
-
-    Cases without a score are excluded. AUC is reported as null when only one
-    class is present because a ranking metric is undefined in that situation.
-    """
+    """Compute AUROC/AUPRC from detector scores without an ML dependency."""
     scored = [case for case in cases if case.score is not None and np.isfinite(case.score)]
     if not scored:
         return {"scored_support": 0, "auroc": None, "auprc": None}
@@ -93,7 +70,6 @@ def ranking_metrics(cases: Sequence[EvaluationCase]) -> dict:
     negatives = int(len(labels) - positives)
     if positives == 0 or negatives == 0:
         return {"scored_support": len(scored), "auroc": None, "auprc": None}
-
     order = np.argsort(-scores, kind="mergesort")
     y = labels[order]
     s = scores[order]
@@ -103,16 +79,17 @@ def ranking_metrics(cases: Sequence[EvaluationCase]) -> dict:
     fp = np.cumsum(1 - y)[thresholds]
     tpr = np.r_[0.0, tp / positives, 1.0]
     fpr = np.r_[0.0, fp / negatives, 1.0]
-    auroc = float(np.trapezoid(tpr, fpr))
-
+    auroc = float(np.trapz(tpr, fpr))
     recall = np.r_[0.0, tp / positives]
     precision = np.r_[1.0, tp / np.maximum(tp + fp, 1)]
-    auprc = float(np.trapezoid(precision, recall))
+    auprc = float(np.trapz(precision, recall))
     return {"scored_support": len(scored), "auroc": auroc, "auprc": auprc}
 
 
 def calibration_metrics(cases: Sequence[EvaluationCase], bins: int = 10) -> dict:
     """Report Brier score and expected calibration error for [0,1] scores."""
+    if bins < 2:
+        raise ValueError("bins must be at least 2")
     scored = [case for case in cases if case.score is not None and np.isfinite(case.score)]
     if not scored:
         return {"scored_support": 0, "brier_score": None, "ece": None, "bins": bins}
@@ -122,7 +99,8 @@ def calibration_metrics(cases: Sequence[EvaluationCase], bins: int = 10) -> dict
     ece = 0.0
     edges = np.linspace(0.0, 1.0, bins + 1)
     for index in range(bins):
-        mask = (scores >= edges[index]) & (scores < edges[index + 1] if index < bins - 1 else scores <= edges[index + 1])
+        upper_mask = scores < edges[index + 1] if index < bins - 1 else scores <= edges[index + 1]
+        mask = (scores >= edges[index]) & upper_mask
         if np.any(mask):
             ece += float(mask.mean()) * abs(float(scores[mask].mean()) - float(labels[mask].mean()))
     return {"scored_support": len(scored), "brier_score": brier, "ece": float(ece), "bins": bins}
@@ -134,7 +112,6 @@ def _metric_from_flags(expected: np.ndarray, detected: np.ndarray, metric: str) 
 
 
 def bootstrap_confidence_interval(cases: Sequence[EvaluationCase], metric: str = "f1", confidence: float = 0.95, iterations: int = 2000, seed: int = 20260822) -> dict:
-    """Return a deterministic percentile bootstrap interval for a classification metric."""
     if not 0 < confidence < 1:
         raise ValueError("confidence must be between 0 and 1")
     if iterations < 100:
@@ -167,14 +144,10 @@ def latency_summary(cases: Sequence[EvaluationCase]) -> dict:
 def evaluate_cases(cases: Iterable[EvaluationCase], bootstrap: bool = True) -> dict:
     materialized: List[EvaluationCase] = list(cases)
     matrix = confusion_matrix(materialized)
-    metrics = classification_metrics(matrix)
     scenarios = {}
     for scenario in sorted({case.scenario for case in materialized}):
         subset = [case for case in materialized if case.scenario == scenario]
         scenarios[scenario] = classification_metrics(confusion_matrix(subset))
-    result = {"corpus_size": len(materialized), "metrics": metrics, "ranking": ranking_metrics(materialized), "calibration": calibration_metrics(materialized), "latency": latency_summary(materialized), "scenarios": scenarios}
-    if bootstrap and materialized:
-        result["confidence_intervals"] = {metric: bootstrap_confidence_interval(materialized, metric=metric) for metric in ("precision", "recall", "f1", "false_positive_rate")}
-    else:
-        result["confidence_intervals"] = {}
+    result = {"corpus_size": len(materialized), "metrics": classification_metrics(matrix), "ranking": ranking_metrics(materialized), "calibration": calibration_metrics(materialized), "latency": latency_summary(materialized), "scenarios": scenarios}
+    result["confidence_intervals"] = ({metric: bootstrap_confidence_interval(materialized, metric=metric) for metric in ("precision", "recall", "f1", "false_positive_rate")} if bootstrap and materialized else {})
     return result
