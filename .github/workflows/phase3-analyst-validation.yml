@@ -1,0 +1,35 @@
+name: Phase 3 Analyst Validation
+
+on:
+  pull_request:
+    paths:
+      - "core/analyst.py"
+      - "core/analyst_routes.py"
+      - "enterprise_app.py"
+      - "alembic/**"
+      - "tests/test_analyst_*.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyst-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      THREATFADE_ENV: development
+      THREATFADE_ALLOW_DEV_AUTH: "true"
+      THREATFADE_DATABASE_URL: sqlite:///./phase3-validation.db
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt
+      - run: python -m pytest -q tests/test_analyst_workflow.py tests/test_analyst_api.py tests/test_enterprise_security.py
+      - run: python -m compileall -q core enterprise_app.py
