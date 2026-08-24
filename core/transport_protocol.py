@@ -45,25 +45,28 @@ class DurableReplayLedger:
     def accept(self, *, batch_id: str, tenant_id: str, sensor_id: str, first_sequence: int, last_sequence: int) -> str:
         if not batch_id or not tenant_id or not sensor_id or first_sequence < 1 or last_sequence < first_sequence:
             raise ValueError("invalid replay metadata")
-        existing = self.db.execute("SELECT 1 FROM replay_batches WHERE batch_id=?", (batch_id,)).fetchone()
-        if existing:
-            return "duplicate"
-        row = self.db.execute("SELECT last_sequence FROM replay_cursors WHERE tenant_id=? AND sensor_id=?", (tenant_id, sensor_id)).fetchone()
-        previous = int(row[0]) if row else 0
-        if last_sequence <= previous:
-            return "replay"
-        if previous and first_sequence > previous + 1:
-            return "gap"
-        now = datetime.now(timezone.utc).isoformat()
         self.db.execute("BEGIN IMMEDIATE")
         try:
+            existing = self.db.execute("SELECT 1 FROM replay_batches WHERE batch_id=?", (batch_id,)).fetchone()
+            if existing:
+                self.db.execute("COMMIT")
+                return "duplicate"
+            row = self.db.execute("SELECT last_sequence FROM replay_cursors WHERE tenant_id=? AND sensor_id=?", (tenant_id, sensor_id)).fetchone()
+            previous = int(row[0]) if row else 0
+            if last_sequence <= previous:
+                self.db.execute("COMMIT")
+                return "replay"
+            if previous and first_sequence > previous + 1:
+                self.db.execute("COMMIT")
+                return "gap"
+            now = datetime.now(timezone.utc).isoformat()
             self.db.execute("INSERT INTO replay_batches VALUES(?,?,?,?,?,?)", (batch_id, tenant_id, sensor_id, first_sequence, last_sequence, now))
             self.db.execute("INSERT INTO replay_cursors VALUES(?,?,?) ON CONFLICT(tenant_id,sensor_id) DO UPDATE SET last_sequence=excluded.last_sequence", (tenant_id, sensor_id, last_sequence))
             self.db.execute("COMMIT")
+            return "accepted"
         except Exception:
             self.db.execute("ROLLBACK")
             raise
-        return "accepted"
 
 
 class SigningTrustStore:
@@ -82,7 +85,10 @@ class SigningTrustStore:
     def add(self, key: SigningKey) -> None:
         if key.revoked_at:
             raise ValueError("cannot add a revoked key")
-        self.db.execute("INSERT OR REPLACE INTO signing_keys VALUES(?,?,?,?,?,?,?)", tuple(key.__dict__.values()))
+        self.db.execute(
+            "INSERT OR REPLACE INTO signing_keys(key_id,algorithm,public_key_b64,created_at,not_before,not_after,revoked_at) VALUES(?,?,?,?,?,?,?)",
+            (key.key_id, key.algorithm, key.public_key_b64, key.created_at, key.not_before, key.not_after, key.revoked_at),
+        )
 
     def revoke(self, key_id: str) -> None:
         if not self.db.execute("SELECT 1 FROM signing_keys WHERE key_id=?", (key_id,)).fetchone():
