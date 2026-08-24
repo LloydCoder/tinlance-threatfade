@@ -2,9 +2,9 @@
 
 **Program:** Enterprise Hardening  
 **Current release baseline:** v0.7.0  
-**Current group:** Group 13 — Resilient Offline Evidence  
-**Current build:** Builds 91–97  
-**Status:** GROUP 13 GREEN — repository gates complete; production field validation not established
+**Current group:** Group 14 — Analyst Investigation & Operational Workflow  
+**Current build:** Builds 98–107  
+**Status:** GROUP 14 IMPLEMENTED — repository validation pending
 
 ## Completed groups
 
@@ -20,78 +20,67 @@
 - Group 10 — Real-World Evidence & Validation Framework: ✅ Builds 63–70
 - Group 11 — Detection Data Plane & Sensor Architecture: ✅ Builds 71–78
 - Group 12 — Multi-Domain Fade Correlation: ✅ Builds 83–90
-- Group 13 — Resilient Offline Evidence: ✅ Builds 91–97 — repository gates green
+- Group 13 — Resilient Offline Evidence: ✅ Builds 91–97
+- Group 14 — Analyst Investigation & Operational Workflow: 🟡 Builds 98–107 — validation pending
 
-## Group 13 — Resilient Offline Evidence
+## Group 14 — Analyst Investigation & Operational Workflow
 
 | Build | Deliverable | Status |
 |---|---|---|
-| 91 | Bounded durable store-and-forward queue | 🟢 |
-| 92 | Bandwidth-aware transmission planner | 🟢 |
-| 93 | Durable replay/idempotency protocol | 🟢 |
-| 94 | Portable ThreatFade Evidence Package v1 | 🟢 |
-| 95 | Cryptographic evidence signing | 🟢 |
-| 96 | Offline verification | 🟢 |
-| 97 | Air-gapped validation gate | 🟢 |
+| 98 | Detection inbox | 🟢 |
+| 99 | Fade investigation workspace | 🟢 |
+| 100 | Evidence timeline | 🟢 |
+| 101 | Entity correlation | 🟢 |
+| 102 | Network/session explorer | 🟢 |
+| 103 | Case management integration | 🟢 |
+| 104 | Analyst disposition | 🟢 |
+| 105 | Analyst feedback/workflow history | 🟢 |
+| 106 | Secure engine/web boundary for analyst operations | 🟢 |
+| 107 | End-to-end detection-to-disposition workflow | 🟢 implementation; validation pending |
 
-### Group 13 implementation evidence
+## Group 14 implementation evidence
 
-- `core/offline_transport.py`
-- `core/transport_batch.py`
-- `core/transport_protocol.py`
-- `tests/test_offline_transport.py`
-- `tests/test_transport_protocol.py`
-- `scripts/validate_phase2.py`
-- `.github/workflows/phase2-offline-evidence.yml`
-- `docs/PHASE_2_OFFLINE_EVIDENCE.md`
-- `docs/adr/0002-offline-evidence-transport.md`
-- `.gitleaks.toml`
+- `core/analyst.py`
+- `core/analyst_routes.py`
+- `enterprise_app.py`
+- `alembic/versions/20260824_0004_analyst_workflow.py`
+- `tests/test_analyst_workflow.py`
+- `app/soc/page.tsx`
+- `app/soc/[id]/page.tsx`
+- `app/soc/[id]/timeline/page.tsx`
+- `app/api/analyst/[...path]/route.ts`
 
-### Group 13 acceptance gate
+## Acceptance boundary
 
-- [x] Sensor-side storage is durable and bounded.
-- [x] Group 11 in-memory backpressure remains unchanged.
-- [x] Queue retention, disk/event limits and priority-aware eviction are explicit.
-- [x] Control-plane/network loss does not delete locally queued events.
-- [x] Bandwidth-aware batching is bounded by byte budgets.
-- [x] Event sequence numbers provide deterministic tenant/sensor-local ordering.
-- [x] Batch IDs and persistent per-tenant/per-sensor cursors provide replay/idempotency protection.
-- [x] Sequence gaps are surfaced rather than silently reordered.
-- [x] Tenant and sensor identity are verified before acceptance.
-- [x] Evidence packages contain manifest, schema, counts, hashes, evidence, provenance, identity and signature metadata.
-- [x] Ed25519 signatures protect canonical manifest content.
-- [x] Trust-store rotation and explicit revocation are supported.
-- [x] Expired/revoked/untrusted keys fail closed.
-- [x] Offline verification requires no control-plane network access.
-- [x] Tampering, malformed packages and manifest/event mismatches fail closed.
-- [x] Reproducible air-gap validation is automated.
-- [x] Repository CI, security, supply-chain, Group 10 and Group 11 gates are green.
-- [ ] Real deployment soak test across prolonged outage, disk exhaustion and production key-management infrastructure.
+- Detection inbox is tenant-scoped and bounded.
+- Workflow state is separate from immutable detection/evidence records.
+- Server-side engine authorization remains authoritative; the browser never supplies tenant identity or privileged engine credentials.
+- Mutating web proxy requests require a same-origin request when an Origin header is present.
+- Evidence is displayed with provenance hashes and explicitly separated from confidence/score.
+- Investigation supports triage, investigation, evidence review, timeline, case linking, disposition and feedback history.
+- Object-level detection/case access is tenant constrained.
+- Repository validation must cover tenant isolation, invalid workflow/disposition inputs, route security, lint/typecheck/build and end-to-end navigation before this group is marked green.
 
 ## Capability truth
 
 | Capability | Repository status | Production-validation status |
 |---|---|---|
-| Reliability / observability | Implemented | Repository validation present |
-| Disaster recovery | Implemented | Repository restore drill present; provider-level DR remains deployment work |
-| Secure deployment / supply chain | Implemented | Repository gates present; independent assurance remains external |
-| Governed evaluation corpus | Implemented as evaluation infrastructure | Real-world independent corpus validation remains external |
-| Evidence / validation framework | Implemented | Independent detection validation remains external |
-| Detection data plane | Implemented as transport-agnostic primitives | Production sensor fleet not yet established |
-| GNSS ↔ network multi-domain correlation | Implemented | Repository validation present; field validation not established |
-| Durable store-and-forward evidence transport | Implemented | Repository gates green; production deployment soak not established |
-| Portable signed evidence packages | Implemented | Air-gap repository validation green; operational key-management validation not established |
-| Production SOC analyst workflow | Partial platform foundation | End-to-end workflow requires further validation |
-| Endpoint/edge production deployment | Partial architecture | Platform-specific deployment not yet validated |
+| Detection inbox | Implemented | Repository validation pending |
+| Investigation workspace | Implemented | Repository validation pending |
+| Evidence timeline | Implemented | Repository validation pending |
+| Entity/session explorer | Implemented as correlation-scoped investigation records | Production sensor/entity fleet validation remains external |
+| Case management | Implemented | Repository validation pending |
+| Analyst disposition | Implemented | Repository validation pending |
+| Analyst feedback | Implemented through workflow/disposition audit history | Model-training impact is not claimed |
+| Secure web/engine boundary | Implemented | Deployment identity-provider validation remains external |
+| FusionOps handoff | Existing integration boundary preserved; no contract-breaking changes | External FusionOps end-to-end validation remains deployment work |
 
 ## Verification boundary
 
-Group 13 establishes resilient local transport, replay-safe delivery and independently verifiable evidence packages. It does not establish that a sensor is truthful, that an observed event is malicious, that a signed observation is causally related to another observation, or that production key-management infrastructure has been independently assured.
-
-Repository tests, synthetic corpora and deterministic CI gates are engineering evidence. They are not substitutes for independent field validation, independent penetration testing, certification, customer-scale performance evidence or contractual assurance.
+Group 14 provides an investigation workflow over existing ThreatFade detections and evidence. It does not convert confidence into truth, does not establish causal attribution, and does not claim that synthetic repository workflows equal customer-scale SOC validation. The browser is intentionally prevented from choosing a tenant or supplying privileged engine credentials.
 
 ## Next planned group
 
-**Group 14 — Analyst Investigation & Operational Workflow.**
+**Group 15 — Production Sensor / Edge Runtime.**
 
-Focus: evidence-centric investigation workspace, case/timeline workflows, analyst disposition, durable feedback and safe handoff into FusionOps while preserving the existing integration boundary.
+Focus: production-grade live sensor ingestion, secure enrollment, edge runtime, bounded local processing and platform-specific deployment validation.
