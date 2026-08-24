@@ -4,7 +4,6 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 import json
-from pathlib import Path
 
 from core.correlation import CorrelationObservation, CorrelationPolicy, TemporalCorrelationEngine
 from core.data_plane import new_event
