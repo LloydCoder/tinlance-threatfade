@@ -39,14 +39,23 @@ def test_queue_is_durable_bounded_and_idempotent(tmp_path: Path):
     q2.close()
 
 
+def test_queue_sequences_are_scoped_per_sensor_and_tenant(tmp_path: Path):
+    q = DurableEventQueue(tmp_path / "q.db", policy=QueuePolicy(max_bytes=4096))
+    assert q.enqueue(event(event_id="a", sensor="s1")) == 1
+    assert q.enqueue(event(event_id="b", sensor="s1")) == 2
+    assert q.enqueue(event(event_id="c", sensor="s2")) == 1
+    assert [r["sequence_no"] for r in q.peek(tenant_id="tenant-a", sensor_id="s1")] == [1, 2]
+    assert [r["sequence_no"] for r in q.peek(tenant_id="tenant-a", sensor_id="s2")] == [1]
+
+
 def test_queue_eviction_is_low_priority_first(tmp_path: Path):
     q = DurableEventQueue(tmp_path / "q.db", policy=QueuePolicy(max_bytes=900, max_events=10, retention_seconds=3600))
     q.enqueue(event(event_id="low"), priority=1)
     q.enqueue(event(event_id="high"), priority=100)
     q.enqueue(event(event_id="new"), priority=50)
-    ids = {r["payload"] for r in q.peek()}
-    assert len(ids) <= 2
-    assert any(b'"event_id":"high"' in payload for payload in ids)
+    payloads = {r["payload"] for r in q.peek()}
+    assert len(payloads) <= 2
+    assert any(b'"event_id":"high"' in payload for payload in payloads)
 
 
 def test_queue_expiry_does_not_evict_critical(tmp_path: Path):
@@ -57,6 +66,16 @@ def test_queue_expiry_does_not_evict_critical(tmp_path: Path):
     assert q.expire(now=10) == 1
     assert q.count() == 1
     assert b'"event_id":"critical"' in q.peek()[0]["payload"]
+
+
+def test_queue_fails_explicitly_when_disk_headroom_is_unavailable(tmp_path: Path, monkeypatch):
+    import core.offline_transport as transport
+    class Usage:
+        free = 0
+    monkeypatch.setattr(transport.shutil, "disk_usage", lambda _: Usage())
+    q = DurableEventQueue(tmp_path / "q.db", policy=QueuePolicy(max_bytes=4096, min_free_bytes=1))
+    with pytest.raises(OSError, match="free-space"):
+        q.enqueue(event())
 
 
 def test_bandwidth_planner_never_exceeds_batch_budget():
@@ -76,7 +95,7 @@ def test_replay_protector_handles_duplicate_replay_and_gap():
 
 def test_batch_rejects_reordered_sequences():
     with pytest.raises(ValueError):
-        batch_payload([{"sequence_no": 2, "payload": b"{}"}, {"sequence_no": 1, "payload": b"{}"}], tenant_id="t", sensor_id="s", batch_id="b")
+        batch_payload([{"sequence_no": 2, "tenant_id": "t", "sensor_id": "s", "payload": b"{}"}, {"sequence_no": 1, "tenant_id": "t", "sensor_id": "s", "payload": b"{}"}], tenant_id="t", sensor_id="s", batch_id="b")
 
 
 def test_signed_package_is_deterministically_verifiable_offline():
@@ -111,10 +130,9 @@ def test_revoked_and_expired_keys_fail():
     assert not verify_signature(payload, signature, expired)
 
 
-def test_package_rejects_modified_event_manifest():
+def test_package_rejects_modified_event_content():
     signer = EvidenceSigner()
     package = build_evidence_package(tenant_id="t", sensor_id="s", events=[event()], signer=signer)
-    # The package is signed; any direct ZIP member mutation must be detected.
     import io, zipfile, json
     source = zipfile.ZipFile(io.BytesIO(package), "r")
     out = io.BytesIO()
@@ -126,5 +144,5 @@ def test_package_rejects_modified_event_manifest():
                 data[0]["event_id"] = "attacker"
                 content = json.dumps(data, sort_keys=True, separators=(",", ":")).encode()
             z.writestr(name, content)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="event content digest"):
         verify_evidence_package(out.getvalue(), {signer.key_id: signer.metadata})
