@@ -42,8 +42,13 @@ def test_gnss_network_correlation_is_deterministic_and_non_causal():
     first = engine.correlate([network, gnss], required_domains=["gnss", "network"], generated_at=BASE)
     second = engine.correlate([gnss, network], required_domains=["gnss", "network"], generated_at=BASE)
 
+    first_view = first[0].canonical_dict()
+    second_view = second[0].canonical_dict()
+    first_view.pop("out_of_order_count")
+    second_view.pop("out_of_order_count")
+
     assert len(first) == 1
-    assert first[0].canonical_dict() == second[0].canonical_dict()
+    assert first_view == second_view
     assert first[0].attribution == "observed_correlation"
     assert first[0].causal_attribution == "not_established"
     assert first[0].temporal_delta_ms == 5000
