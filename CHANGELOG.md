@@ -2,6 +2,26 @@
 
 All notable changes to ThreatFade will be documented in this file.
 
+## Unreleased — Phase 2 Resilient Transport and Offline Evidence
+
+### Added
+- Bounded SQLite-backed store-and-forward queue after the canonical Group 11 `SignalEvent` boundary.
+- Explicit event/byte limits, seven-day default retention and priority-aware eviction.
+- Bandwidth-aware batch selection with bounded byte budgets and no destructive acknowledgement before transport success.
+- Monotonic sensor-local event sequencing and durable per-tenant/per-sensor replay cursors.
+- Idempotent batch IDs and explicit duplicate/replay/gap outcomes.
+- Signed batch envelopes using Ed25519.
+- Portable ThreatFade Evidence Package v1 with manifest, event/evidence hashes, provenance, sensor/tenant identity and signature metadata.
+- Offline package verification without control-plane network access.
+- Persistent signing trust store with additive key rotation and explicit revocation.
+- Hostile-condition tests for disk/resource bounds, tampering, tenant mismatch, replay, duplicate delivery, sequence gaps, expiry and revocation.
+- Reproducible air-gap validation workflow.
+
+### Evidence boundary
+- Phase 2 is **implemented — repository validated; production deployment soak not yet established**.
+- Cryptographic verification proves integrity/authenticity of signed bytes; it does not prove sensor truth, maliciousness or causal attribution.
+- Repository air-gap validation does not substitute for production PKI/HSM/key-management validation.
+
 ## Unreleased — Phase 1 Multi-Domain Fade Correlation
 
 ### Added
@@ -17,7 +37,7 @@ All notable changes to ThreatFade will be documented in this file.
 - Phase 1 architecture and validation-boundary documentation.
 
 ### Evidence boundary
-- Phase 1 is **implemented — not yet production validated**.
+- Phase 1 is **implemented — repository validated; production field validation not established**.
 - Correlation results are explicitly labeled `observed_correlation` and `causal_attribution=not_established`.
 - Synthetic validation does not establish field false-positive/false-negative rates, GNSS jamming/spoofing classification accuracy, causality or customer-scale performance.
 
@@ -58,64 +78,3 @@ All notable changes to ThreatFade will be documented in this file.
 - Backup catalog verification using `pg_restore --list`.
 - Isolated restore drill verifying Alembic migration state, required enterprise tables and forced PostgreSQL RLS.
 - Disaster-recovery architecture acceptance gate.
-- CI-integrated backup creation, artifact verification and isolated restore verification against PostgreSQL 16.
-- Recovery runbook defining RPO/RTO targets, backup tiers, restore procedure, integrity checks and infrastructure boundaries.
-
-#### Operational notes
-- Production low-RPO recovery is expected to use provider-native PostgreSQL PITR/WAL archiving; the repository's logical dump is a complementary portable recovery mechanism.
-- CI recovery artifacts are ephemeral and are never committed to the repository.
-- RPO/RTO values are engineering targets, not contractual guarantees.
-
-## [0.5.0] – 2026-08-22
-
-### Reliability, Observability & Resilience
-
-#### Added
-- Prometheus-compatible request counters, latency histograms, in-flight gauges, detection counters and build metadata.
-- Low-cardinality HTTP telemetry with optional OpenTelemetry tracing spans.
-- Dependency-aware readiness checks with real database connectivity validation.
-- Explicit liveness, readiness and startup operational endpoints.
-- FastAPI lifespan lifecycle state for controlled startup and shutdown.
-- Bounded exponential retry policy with jitter and transient-error filtering.
-- Thread-safe circuit breaker with closed/open/half-open recovery.
-- Synchronous and asynchronous bulkhead primitives for bounded concurrency.
-- Reliability acceptance script and regression tests.
-- Kubernetes startup/readiness/liveness probes, safe rolling updates, topology spread and PodDisruptionBudget.
-- Container healthcheck now tests liveness independently of backend readiness.
-
-## [1.0.0-beta] – 2026-03-09
-
-### Initial Release
-
-**Early Research MVP – Simulated data only**
-
-#### Added
-- Core fade detection engine (entropy + z-score + rule-based)
-- Multi-scenario signal simulation
-- JSON report export
-- Comprehensive pytest test suite
-- YAML configuration management
-- Environment variable support for secrets
-- GitHub Actions CI/CD pipeline
-- Apache 2.0 open-core licensing
-
-#### Known Limitations
-- Detection trained on simulated data only
-- False positive rate unknown on real traffic
-- MITRE/Volatility implementations are stubs
-- Telegram-only alerts
-- No endpoint agents yet
-
----
-
-## Versioning
-
-This project follows Semantic Versioning.
-
-## Contributing
-
-Found a bug or want to contribute? See [CONTRIBUTING.md](CONTRIBUTING.md)
-
----
-
-© 2026 Tinlance Limited
