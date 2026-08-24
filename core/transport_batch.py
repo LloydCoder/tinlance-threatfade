@@ -25,8 +25,18 @@ class SignedBatch:
         return _canonical(self.__dict__)
 
 
+def _sequenced_records(records: Sequence[Mapping[str, Any]], *, tenant_id: str, sensor_id: str) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    for record in records:
+        payload = json.loads(bytes(record["payload"]).decode())
+        payload["sequence_no"] = int(record["sequence_no"])
+        normalized.append({**record, "tenant_id": tenant_id, "sensor_id": sensor_id, "payload": _canonical(payload)})
+    return normalized
+
+
 def sign_batch(records: Sequence[Mapping[str, Any]], *, tenant_id: str, sensor_id: str, batch_id: str, signer: EvidenceSigner) -> SignedBatch:
-    payload = batch_payload(records, tenant_id=tenant_id, sensor_id=sensor_id, batch_id=batch_id)
+    normalized = _sequenced_records(records, tenant_id=tenant_id, sensor_id=sensor_id)
+    payload = batch_payload(normalized, tenant_id=tenant_id, sensor_id=sensor_id, batch_id=batch_id)
     decoded = json.loads(payload)
     return SignedBatch(batch_id=batch_id, tenant_id=tenant_id, sensor_id=sensor_id, first_sequence=decoded["first_sequence"], last_sequence=decoded["last_sequence"], payload_b64=base64.b64encode(payload).decode(), signature_b64=signer.sign(payload), signing_key_id=signer.key_id)
 
