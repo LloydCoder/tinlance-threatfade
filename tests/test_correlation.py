@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -22,7 +23,7 @@ def observation(event_id: str, *, domain: str, signal_type: str, seconds: float,
         observed_at=BASE + timedelta(seconds=seconds),
         metadata={"domain": domain, "signal_type": signal_type},
     )
-    # Keep event IDs deterministic for test reproducibility while retaining a canonical digest.
+    event = replace(event, event_id=event_id)
     return CorrelationObservation.from_event(
         event,
         domain=domain,
@@ -90,7 +91,7 @@ def test_tenant_isolation_prevents_cross_tenant_correlation():
     assert TemporalCorrelationEngine().correlate([gnss, network], required_domains=["gnss", "network"]) == []
 
 
-def test_conflicting_or_uncertain_observation_reduces_confidence():
+def test_uncertain_observation_reduces_confidence():
     gnss = observation("gnss-1", domain="gnss", signal_type="disruption", seconds=10, uncertainty=1.0)
     network = observation("network-1", domain="network", signal_type="c2_fade", seconds=12)
     assert TemporalCorrelationEngine().correlate([gnss, network], required_domains=["gnss", "network"]) == []
