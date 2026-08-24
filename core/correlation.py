@@ -249,7 +249,7 @@ class TemporalCorrelationEngine:
 
         results: list[CorrelatedDetection] = []
         for anchor in ordered:
-            if anchor.signal_score < self.policy.min_signal_score:
+            if anchor.effective_score < self.policy.min_signal_score:
                 continue
             candidates = [
                 item
@@ -257,7 +257,7 @@ class TemporalCorrelationEngine:
                 if item.event_id != anchor.event_id
                 and item.tenant_id == anchor.tenant_id
                 and item.domain != anchor.domain
-                and item.signal_score >= self.policy.min_signal_score
+                and item.effective_score >= self.policy.min_signal_score
                 and abs((item.observed_at - anchor.observed_at).total_seconds()) <= self.policy.window_seconds
             ]
             if not candidates:
