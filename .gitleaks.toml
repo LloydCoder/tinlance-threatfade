@@ -8,6 +8,6 @@ useDefault = true
 # credential material was present. The current implementation uses `key_material`.
 # Scope this exception to that single historical commit; do not allowlist the
 # file, rule, path, or future commits globally.
-[[allowlists]]
+[allowlist]
 description = "Phase 2 historical generic-api-key false positive"
 commits = ["1a0e28ee487b3044b16e4d523cbeb7b8f96238e0"]
