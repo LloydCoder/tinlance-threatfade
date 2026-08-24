@@ -4,7 +4,7 @@
 **Current release baseline:** v0.7.0  
 **Current group:** Group 13 — Resilient Offline Evidence  
 **Current build:** Builds 91–97  
-**Status:** GROUP 13 IMPLEMENTED — repository validation pending final CI; production field validation not established
+**Status:** GROUP 13 GREEN — repository gates complete; production field validation not established
 
 ## Completed groups
 
@@ -20,7 +20,7 @@
 - Group 10 — Real-World Evidence & Validation Framework: ✅ Builds 63–70
 - Group 11 — Detection Data Plane & Sensor Architecture: ✅ Builds 71–78
 - Group 12 — Multi-Domain Fade Correlation: ✅ Builds 83–90
-- Group 13 — Resilient Offline Evidence: 🟡 Builds 91–97 — implementation complete; final CI gate pending
+- Group 13 — Resilient Offline Evidence: ✅ Builds 91–97 — repository gates green
 
 ## Group 13 — Resilient Offline Evidence
 
@@ -44,6 +44,8 @@
 - `scripts/validate_phase2.py`
 - `.github/workflows/phase2-offline-evidence.yml`
 - `docs/PHASE_2_OFFLINE_EVIDENCE.md`
+- `docs/adr/0002-offline-evidence-transport.md`
+- `.gitleaks.toml`
 
 ### Group 13 acceptance gate
 
@@ -52,8 +54,8 @@
 - [x] Queue retention, disk/event limits and priority-aware eviction are explicit.
 - [x] Control-plane/network loss does not delete locally queued events.
 - [x] Bandwidth-aware batching is bounded by byte budgets.
-- [x] Event sequence numbers provide deterministic sensor-local ordering.
-- [x] Batch IDs and persistent per-sensor cursors provide replay/idempotency protection.
+- [x] Event sequence numbers provide deterministic tenant/sensor-local ordering.
+- [x] Batch IDs and persistent per-tenant/per-sensor cursors provide replay/idempotency protection.
 - [x] Sequence gaps are surfaced rather than silently reordered.
 - [x] Tenant and sensor identity are verified before acceptance.
 - [x] Evidence packages contain manifest, schema, counts, hashes, evidence, provenance, identity and signature metadata.
@@ -63,7 +65,7 @@
 - [x] Offline verification requires no control-plane network access.
 - [x] Tampering, malformed packages and manifest/event mismatches fail closed.
 - [x] Reproducible air-gap validation is automated.
-- [x] Documentation states that integrity/authenticity of signed bytes does not prove sensor truth or causality.
+- [x] Repository CI, security, supply-chain, Group 10 and Group 11 gates are green.
 - [ ] Real deployment soak test across prolonged outage, disk exhaustion and production key-management infrastructure.
 
 ## Capability truth
@@ -77,8 +79,8 @@
 | Evidence / validation framework | Implemented | Independent detection validation remains external |
 | Detection data plane | Implemented as transport-agnostic primitives | Production sensor fleet not yet established |
 | GNSS ↔ network multi-domain correlation | Implemented | Repository validation present; field validation not established |
-| Durable store-and-forward evidence transport | Implemented | Production deployment soak not established |
-| Portable signed evidence packages | Implemented | Air-gap repository validation present; operational key-management validation not established |
+| Durable store-and-forward evidence transport | Implemented | Repository gates green; production deployment soak not established |
+| Portable signed evidence packages | Implemented | Air-gap repository validation green; operational key-management validation not established |
 | Production SOC analyst workflow | Partial platform foundation | End-to-end workflow requires further validation |
 | Endpoint/edge production deployment | Partial architecture | Platform-specific deployment not yet validated |
 
