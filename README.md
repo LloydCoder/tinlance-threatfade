@@ -4,7 +4,7 @@
 
 ThreatFade detects moments when adversaries intentionally reduce observable signals—including C2 quieting, gradual living-off-the-land activity reduction and GNSS interference—using entropy analysis, statistical deviation, heuristic detection, confidence scoring, optional ML anomaly detection, ATT&CK mapping, interoperable exports and operational integrations.
 
-**Status:** v0.4.0 — enterprise engineering baseline  
+**Status:** v0.7.0 — enterprise engineering baseline  
 **License:** Apache 2.0 (open-core)
 
 ## What ThreatFade is
@@ -37,7 +37,7 @@ The current UX includes:
 - Keyboard-friendly investigation dismissal and explicit loading, empty and degraded states.
 - No third-party frontend dependency required for the reference console.
 
-The dashboard follows established observability guidance: operational dashboards should answer defined questions, keep hierarchy clear and support drill-down rather than maximizing the number of charts. OpenTelemetry likewise recommends common semantic conventions so telemetry can be correlated consistently across metrics, logs and traces. urlOpenTelemetry semantic conventionshttps://opentelemetry.io/docs/specs/semconv/
+The dashboard follows established observability guidance: operational dashboards should answer defined questions, keep hierarchy clear and support drill-down rather than maximizing the number of charts. OpenTelemetry likewise recommends common semantic conventions so telemetry can be correlated consistently across metrics, logs and traces.
 
 ## Quick start
 
@@ -288,6 +288,10 @@ ThreatFade/
 ├── docker-compose.yml
 └── .github/workflows/   # CI and security gates
 ```
+
+## Release truth
+
+The current release baseline is **v0.7.0**, corresponding to the completed enterprise-hardening Groups 1–11 documented in `docs/BUILD_STATUS.md`. Group 11 establishes the canonical detection data-plane and sensor lifecycle architecture; it does not by itself prove production live packet capture, durable store-and-forward transport, multi-domain GNSS/network correlation, customer-scale throughput or independent detection validation.
 
 ## License
 
