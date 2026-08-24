@@ -12,16 +12,15 @@ handled explicitly and never silently converted into stronger evidence.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import hashlib
 import json
 import math
 from typing import Any, Iterable, Mapping, Sequence
-from uuid import uuid5, NAMESPACE_URL
+from uuid import NAMESPACE_URL, uuid5
 
 from .data_plane import SignalEvent
 from .integrity import evidence_custody_hash
-
 
 CORRELATION_SCHEMA_VERSION = "1.0"
 DEFAULT_WINDOW_SECONDS = 30.0
@@ -232,7 +231,6 @@ class TemporalCorrelationEngine:
         if not items:
             return []
 
-        # Duplicate event IDs are excluded from scoring after the first canonical event.
         seen: set[str] = set()
         duplicates: list[str] = []
         unique: list[CorrelationObservation] = []
@@ -254,7 +252,8 @@ class TemporalCorrelationEngine:
             if anchor.signal_score < self.policy.min_signal_score:
                 continue
             candidates = [
-                item for item in ordered
+                item
+                for item in ordered
                 if item.event_id != anchor.event_id
                 and item.tenant_id == anchor.tenant_id
                 and item.domain != anchor.domain
