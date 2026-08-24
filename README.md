@@ -127,10 +127,219 @@ Signal / PCAP
   → analyst investigation / disposition
 ```
 
+Multi-domain correlation is implemented as a reusable, domain-agnostic temporal layer. GNSS disruption ↔ network fade/C2 is the first detection-pack implementation. Correlation results are explicitly **observed temporal association**, not causal attribution.
+
 Phase 2 also defines the portable **ThreatFade Evidence Package v1** for offline transfer and verification. Cryptographic verification establishes integrity/authenticity of the signed bytes; it does not prove sensor truth, maliciousness or causality.
 
-## Offline evidence
+## Detection capabilities
 
-See [`docs/PHASE_2_OFFLINE_EVIDENCE.md`](docs/PHASE_2_OFFLINE_EVIDENCE.md) for the protocol specification, queue limits, replay semantics, key lifecycle, failure behavior and air-gapped verification procedure.
+- PCAP/PCAPNG ingestion.
+- Hybrid encrypted/unencrypted signal extraction.
+- Rolling Shannon entropy.
+- Z-score anomaly detection.
+- C2, LOTL and GNSS fade scenarios.
+- Reusable temporal multi-domain correlation.
+- GNSS disruption ↔ network fade/C2 correlation detection pack.
+- Optional Isolation Forest anomaly layer.
+- Structured evidence and confidence scoring.
+- Alert deduplication.
+- Live network/process monitoring components.
+- AIS/ADS-B/GPS signal-fusion components.
+- Deterministic benchmarks and robustness tests.
+- Bounded durable store-and-forward transport when the control plane is unavailable.
+- Signed replay-safe batches and portable offline evidence packages.
 
-The current repository status intentionally distinguishes **implemented repository behavior** from **production deployment validation**. Real sensor-fleet soak tests, production PKI/HSM integration and customer-scale reliability evidence remain separate validation work.
+### Detection-as-code
+
+Detection packs use stable IDs, semantic versions, descriptions and ATT&CK mappings. The intended lifecycle is:
+
+**Research → Backtest → Canary → Production → Deprecated**
+
+Core rules include `TF-C2-001`, `TF-LOTL-001`, `TF-GNSS-001` and `TF-GNSS-CORR-001`.
+
+## Enterprise identity and tenancy
+
+- OIDC/JWT validation with issuer, audience, JWKS and time-claim validation.
+- RBAC roles: `viewer`, `analyst`, `api_only`, `admin`, `tenant_admin`.
+- Tenant-scoped detection persistence.
+- Cross-tenant access denied by default.
+- Tenant-admin/platform-admin separation.
+- Production fail-closed authentication.
+- Append-oriented audit events with request and principal context.
+- PostgreSQL production persistence through SQLAlchemy.
+- SQLite development persistence.
+- Investigation case persistence primitives.
+- Offline transport replay state is tenant/sensor scoped and fail-closed on identity mismatch.
+
+Production OIDC settings:
+
+```text
+THREATFADE_OIDC_ISSUER
+THREATFADE_OIDC_AUDIENCE
+THREATFADE_OIDC_JWKS_URL   # optional; issuer discovery is used when omitted
+```
+
+Production tokens must contain `sub`, `exp`, `iat` and a tenant claim using the documented tenant naming convention. Exact redirect URI registration, TLS, secure token handling and PKCE where applicable remain deployment requirements.
+
+## Security and supply chain
+
+The repository includes:
+
+- Bounded request and PCAP inputs.
+- Rate limiting.
+- Request IDs.
+- Restrictive CORS.
+- Security headers.
+- Finite-number validation.
+- Safe temporary PCAP handling.
+- Non-root container execution.
+- Dropped Linux capabilities.
+- `no-new-privileges`.
+- Kubernetes security context and health probes.
+- Dependabot.
+- CodeQL.
+- Gitleaks.
+- `pip-audit`.
+- SBOM generation.
+- Build provenance/attestation.
+- Keyless Sigstore signing for release images.
+- Ed25519 evidence signatures with explicit key validity/revocation state for offline evidence packages.
+
+## Interoperability
+
+ThreatFade supports:
+
+- JSON.
+- Splunk HEC.
+- CEF.
+- CSV.
+- Sigma-compatible output.
+- STIX 2.1-compatible bundles.
+- MITRE ATT&CK mapping.
+- FusionOps integration.
+
+The goal is not to replace an enterprise SIEM/SOAR. ThreatFade provides a specialized detection/evidence layer that can feed existing security operations systems.
+
+## Benchmarking and validation
+
+Run:
+
+```bash
+python benchmarks/benchmark.py
+python benchmarks/correlation_validation.py
+python scripts/validate_phase2.py
+```
+
+The deterministic benchmark is intentionally separate from real-PCAP validation. The repository records author-confirmed validation against Merlin QUIC C2, Cobalt Strike and IcedID and the documented 0% false-positive baseline across five normal traffic patterns and 100 test runs. These are project validation results—not universal accuracy guarantees.
+
+Phase 1 adds a governed synthetic correlation corpus covering positive/negative temporal relationships, weak signals, missing telemetry and ordering/duplication conditions. This validates deterministic implementation behavior; it does **not** establish field false-positive/false-negative rates, GNSS jamming/spoofing classification accuracy, causal attribution or customer-scale performance.
+
+Phase 2 adds deterministic hostile-condition validation for bounded local storage, replay/idempotency, signature verification, key revocation and portable offline verification. Repository validation is not a substitute for production deployment soak testing or independent key-management assurance.
+
+Independent labeled corpora, third-party penetration testing, purple-team exercises and customer-scale load testing are external assurance activities and are not represented as completed merely because repository tests pass.
+
+## Observability and reliability
+
+ThreatFade includes optional OpenTelemetry instrumentation, request IDs, health/readiness endpoints, structured audit events, alert deduplication, streaming/parallel processing components and operational export paths.
+
+Production teams should measure:
+
+- API availability.
+- Detection p50/p95/p99 latency.
+- Throughput.
+- Error rate.
+- Alert volume.
+- False-positive budget.
+- Resource utilization.
+- Queue depth/backpressure where a distributed deployment is used.
+- Offline queue depth, bytes used, retention/eviction and replay backlog where offline transport is deployed.
+- Backup/restore results.
+- Recovery time and recovery point performance.
+- Correlation latency, clock-skew tolerance and missing-domain rates where multi-domain correlation is deployed.
+
+The readiness endpoint exposes configured SLO targets. Targets are **targets**, not guarantees; production evidence is required before publishing measured SLOs.
+
+## Deployment
+
+Reference local/production Compose assets are provided in the repository. A typical production boundary is:
+
+```bash
+export POSTGRES_PASSWORD='use-a-secret-manager'
+export THREATFADE_OIDC_ISSUER='https://idp.example.com/realms/security'
+export THREATFADE_OIDC_AUDIENCE='threatfade-api'
+export THREATFADE_ALLOWED_ORIGINS='https://console.example.com'
+docker compose up --build
+```
+
+For enterprise Kubernetes deployments, use the hardened container and Kubernetes assets, externalize secrets, configure TLS at the edge, use persistent storage, and connect application telemetry to the organization's observability backend. If offline transport is enabled, its SQLite queue and replay/trust stores must be on persistent, access-controlled storage with capacity monitoring.
+
+## Governance and assurance boundary
+
+The engineering baseline is informed by OWASP ASVS 5.0 and NIST CSF 2.0. Repository documentation includes a threat model, control matrix, architecture decisions, disclosure process and enterprise implementation boundary.
+
+The following cannot be honestly self-certified by a repository:
+
+- SOC 2 / ISO 27001 certification.
+- Independent penetration testing.
+- Independent detection validation.
+- Contractual SLAs.
+- Customer-scale performance guarantees.
+- Data-residency commitments.
+- Organization-level incident-response obligations.
+- Causal attribution of correlated GNSS/network events.
+- Field-validated GNSS jamming/spoofing classification.
+- Production PKI/HSM assurance for offline evidence signing.
+
+Those require organizational controls, evidence, contracts and/or independent assessment.
+
+## Testing
+
+```bash
+python -m compileall -q .
+pytest -q
+python benchmarks/benchmark.py
+python benchmarks/correlation_validation.py
+python scripts/validate_phase2.py
+python -c "from core.detection_pack import detection_pack, validate_pack; validate_pack(detection_pack()); print('detection pack: OK')"
+python scripts/enterprise_smoke.py
+```
+
+GitHub Actions validates Python 3.11 and 3.12, compilation, the complete test suite, benchmark, detection-pack validation, enterprise/dashboard smoke checks and production-container build. The security workflow covers dependency auditing, CodeQL and secret scanning. The Phase 2 workflow adds bounded offline transport, replay, signing and air-gap validation.
+
+## Repository structure
+
+```text
+ThreatFade/
+├── agents/             # signal-generation and endpoint components
+├── api.py              # FastAPI control/data-plane boundary
+├── benchmarks/         # reproducible validation
+├── core/               # detection, correlation, security, storage, evidence and observability
+├── dashboard/          # ThreatFade Dashboard / analyst console
+├── docs/               # enterprise, threat-model and architecture documentation
+├── integrations/       # external operational integrations
+├── mitre/              # ATT&CK mapping
+├── reports/            # generated validation/interoperability outputs
+├── scripts/             # enterprise smoke and operational tooling
+├── tests/               # unit/integration/security coverage
+├── validation/          # governed validation corpora
+├── Dockerfile
+├── docker-compose.yml
+└── .github/workflows/   # CI and security gates
+```
+
+## Release truth
+
+The current release baseline remains **v0.7.0**. Groups 1–11 established the enterprise-hardening and canonical detection data-plane baseline. Group 12 adds reusable multi-domain temporal correlation and the first GNSS/network correlation pack. Group 13 adds resilient offline transport, replay-safe delivery and portable signed evidence packages.
+
+Group 12 is **implemented with repository-level validation**, but it is not represented as independent production validation. In particular, the repository does not claim causal attribution, malicious GNSS interference classification, customer-scale correlation performance or field false-positive/false-negative rates.
+
+Group 13 is **implemented with repository-level validation**. It does not claim production sensor-fleet soak validation, production PKI/HSM assurance or customer-scale reliability evidence.
+
+See `docs/BUILD_STATUS.md` for the evidence-backed implementation and validation boundary.
+
+## License
+
+Apache License 2.0. See `LICENSE`.
+
+**ThreatFade** — Tinlance Limited  
+https://tinlance.com/
