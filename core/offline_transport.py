@@ -1,24 +1,14 @@
 """ThreatFade Phase 2 bounded offline transport and portable evidence."""
 from __future__ import annotations
-
-import base64
-import hashlib
-import json
-import os
-import shutil
-import sqlite3
-import time
-import zipfile
+import base64, hashlib, json, os, shutil, sqlite3, time, zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
-
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
-
 from .data_plane import SignalEvent
 
 PROTOCOL_VERSION = "1.0"
@@ -28,67 +18,37 @@ DEFAULT_RETENTION_SECONDS = 7 * 24 * 3600
 DEFAULT_BATCH_EVENTS = 256
 MAX_EVENT_BYTES = 256 * 1024
 
-
-def _canonical(value: Any) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-
-
-def _sha256(value: bytes) -> str:
-    return hashlib.sha256(value).hexdigest()
-
-
-def _now() -> float:
-    return time.time()
-
-
-def _event_digest(record: Mapping[str, Any]) -> str:
-    return _sha256(_canonical({k: v for k, v in record.items() if k not in {"sequence_no", "event_digest"}}))
-
-
+def _canonical(value: Any) -> bytes: return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+def _sha256(value: bytes) -> str: return hashlib.sha256(value).hexdigest()
+def _now() -> float: return time.time()
+def _event_digest(record: Mapping[str, Any]) -> str: return _sha256(_canonical({k: v for k, v in record.items() if k not in {"sequence_no", "event_digest"}}))
 def _event_record(event: SignalEvent, sequence_no: int) -> dict[str, Any]:
     payload = event.canonical_dict(); payload["sequence_no"] = sequence_no; payload["event_digest"] = event.digest(); return payload
 
-
 @dataclass(frozen=True)
 class QueuePolicy:
-    max_bytes: int = DEFAULT_MAX_BYTES
-    retention_seconds: int = DEFAULT_RETENTION_SECONDS
-    max_events: int = 100_000
-    min_free_bytes: int = 16 * 1024 * 1024
-
+    max_bytes: int = DEFAULT_MAX_BYTES; retention_seconds: int = DEFAULT_RETENTION_SECONDS; max_events: int = 100_000; min_free_bytes: int = 16 * 1024 * 1024
     def __post_init__(self) -> None:
         if not 1 <= self.max_bytes <= 8 * 1024 * 1024 * 1024: raise ValueError("max_bytes out of bounds")
         if not 1 <= self.retention_seconds <= 365 * 24 * 3600: raise ValueError("retention_seconds out of bounds")
         if not 1 <= self.max_events <= 10_000_000: raise ValueError("max_events out of bounds")
         if not 0 <= self.min_free_bytes <= 8 * 1024 * 1024 * 1024: raise ValueError("min_free_bytes out of bounds")
 
-
 class DurableEventQueue:
     """Durable bounded queue with per-tenant/sensor monotonic sequencing."""
-
     def __init__(self, path: str | os.PathLike[str], *, policy: QueuePolicy | None = None):
-        self.path = Path(path); self.path.parent.mkdir(parents=True, exist_ok=True); self.policy = policy or QueuePolicy()
-        self._db = sqlite3.connect(self.path, isolation_level=None, check_same_thread=False)
+        self.path = Path(path); self.path.parent.mkdir(parents=True, exist_ok=True); self.policy = policy or QueuePolicy(); self._db = sqlite3.connect(self.path, isolation_level=None, check_same_thread=False)
         self._db.execute("PRAGMA journal_mode=WAL"); self._db.execute("PRAGMA synchronous=FULL"); self._db.execute("PRAGMA foreign_keys=ON")
-        self._db.executescript("""
-        CREATE TABLE IF NOT EXISTS queue_meta (tenant_id TEXT NOT NULL, sensor_id TEXT NOT NULL, next_sequence INTEGER NOT NULL, PRIMARY KEY(tenant_id,sensor_id));
-        CREATE TABLE IF NOT EXISTS events (event_digest TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, sensor_id TEXT NOT NULL, sequence_no INTEGER NOT NULL, priority INTEGER NOT NULL, observed_at REAL NOT NULL, inserted_at REAL NOT NULL, payload BLOB NOT NULL, state TEXT NOT NULL DEFAULT 'pending', UNIQUE(tenant_id,sensor_id,sequence_no));
-        CREATE INDEX IF NOT EXISTS idx_events_order ON events(priority DESC, inserted_at ASC);
-        CREATE INDEX IF NOT EXISTS idx_events_tenant ON events(tenant_id, sensor_id, sequence_no);
-        """)
-
+        self._db.executescript("""CREATE TABLE IF NOT EXISTS queue_meta (tenant_id TEXT NOT NULL, sensor_id TEXT NOT NULL, next_sequence INTEGER NOT NULL, PRIMARY KEY(tenant_id,sensor_id)); CREATE TABLE IF NOT EXISTS events (event_digest TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, sensor_id TEXT NOT NULL, sequence_no INTEGER NOT NULL, priority INTEGER NOT NULL, observed_at REAL NOT NULL, inserted_at REAL NOT NULL, payload BLOB NOT NULL, state TEXT NOT NULL DEFAULT 'pending', UNIQUE(tenant_id,sensor_id,sequence_no)); CREATE INDEX IF NOT EXISTS idx_events_order ON events(priority DESC, inserted_at ASC); CREATE INDEX IF NOT EXISTS idx_events_tenant ON events(tenant_id, sensor_id, sequence_no);""")
     def close(self) -> None: self._db.close()
     def _size(self) -> int: return int(self._db.execute("SELECT COALESCE(SUM(length(payload)),0) FROM events").fetchone()[0])
-
     def _evict(self, required: int) -> None:
         while self._size() + required > self.policy.max_bytes or self.count() >= self.policy.max_events:
             row = self._db.execute("SELECT event_digest FROM events ORDER BY priority ASC, inserted_at ASC LIMIT 1").fetchone()
             if row is None: raise OSError("offline queue capacity exhausted")
             self._db.execute("DELETE FROM events WHERE event_digest=?", (row[0],))
-
     def _ensure_disk_headroom(self, required: int) -> None:
         if shutil.disk_usage(self.path.parent).free < self.policy.min_free_bytes + required: raise OSError("offline queue minimum free-space limit reached")
-
     def enqueue(self, event: SignalEvent, *, priority: int = 50) -> int:
         if not isinstance(event, SignalEvent): raise TypeError("event must be SignalEvent")
         if not 0 <= priority <= 100: raise ValueError("priority must be between 0 and 100")
@@ -98,30 +58,20 @@ class DurableEventQueue:
         try:
             existing = self._db.execute("SELECT sequence_no FROM events WHERE event_digest=?", (digest,)).fetchone()
             if existing: self._db.execute("COMMIT"); return int(existing[0])
-            self._ensure_disk_headroom(len(payload)); self._evict(len(payload))
-            row = self._db.execute("SELECT next_sequence FROM queue_meta WHERE tenant_id=? AND sensor_id=?", (event.tenant_id, event.sensor_id)).fetchone()
-            sequence = int(row[0]) if row else 1
-            self._db.execute("INSERT OR REPLACE INTO queue_meta VALUES(?,?,?)", (event.tenant_id, event.sensor_id, sequence + 1))
-            self._db.execute("INSERT INTO events(event_digest,tenant_id,sensor_id,sequence_no,priority,observed_at,inserted_at,payload) VALUES(?,?,?,?,?,?,?,?)", (digest, event.tenant_id, event.sensor_id, sequence, priority, event.observed_at.timestamp(), _now(), payload)); self._db.execute("COMMIT"); return sequence
-        except Exception:
-            self._db.execute("ROLLBACK"); raise
-
+            self._ensure_disk_headroom(len(payload)); self._evict(len(payload)); row = self._db.execute("SELECT next_sequence FROM queue_meta WHERE tenant_id=? AND sensor_id=?", (event.tenant_id, event.sensor_id)).fetchone(); sequence = int(row[0]) if row else 1
+            self._db.execute("INSERT OR REPLACE INTO queue_meta VALUES(?,?,?)", (event.tenant_id, event.sensor_id, sequence + 1)); self._db.execute("INSERT INTO events(event_digest,tenant_id,sensor_id,sequence_no,priority,observed_at,inserted_at,payload) VALUES(?,?,?,?,?,?,?,?)", (digest, event.tenant_id, event.sensor_id, sequence, priority, event.observed_at.timestamp(), _now(), payload)); self._db.execute("COMMIT"); return sequence
+        except Exception: self._db.execute("ROLLBACK"); raise
     def count(self) -> int: return int(self._db.execute("SELECT COUNT(*) FROM events").fetchone()[0])
     def bytes_used(self) -> int: return self._size()
     def expire(self, *, now: float | None = None) -> int: return self._db.execute("DELETE FROM events WHERE inserted_at < ? AND priority < 100", ((now if now is not None else _now()) - self.policy.retention_seconds,)).rowcount
-
     def peek(self, *, limit: int = DEFAULT_BATCH_EVENTS, tenant_id: str | None = None, sensor_id: str | None = None) -> list[dict[str, Any]]:
         if not 1 <= limit <= 4096: raise ValueError("invalid batch limit")
         if tenant_id and sensor_id: rows = self._db.execute("SELECT event_digest,tenant_id,sensor_id,sequence_no,priority,payload FROM events WHERE tenant_id=? AND sensor_id=? ORDER BY sequence_no ASC LIMIT ?", (tenant_id, sensor_id, limit)).fetchall()
         elif tenant_id: rows = self._db.execute("SELECT event_digest,tenant_id,sensor_id,sequence_no,priority,payload FROM events WHERE tenant_id=? ORDER BY sequence_no ASC LIMIT ?", (tenant_id, limit)).fetchall()
         else: rows = self._db.execute("SELECT event_digest,tenant_id,sensor_id,sequence_no,priority,payload FROM events ORDER BY priority DESC, inserted_at ASC LIMIT ?", (limit,)).fetchall()
         return [{"event_digest": r[0], "tenant_id": r[1], "sensor_id": r[2], "sequence_no": r[3], "priority": r[4], "payload": bytes(r[5])} for r in rows]
-
-    def acknowledge(self, digests: Iterable[str]) -> int:
-        return sum(self._db.execute("DELETE FROM events WHERE event_digest=?", (d,)).rowcount for d in dict.fromkeys(digests))
-
+    def acknowledge(self, digests: Iterable[str]) -> int: return sum(self._db.execute("DELETE FROM events WHERE event_digest=?", (d,)).rowcount for d in dict.fromkeys(digests))
     def metrics(self) -> dict[str, int]: return {"events": self.count(), "bytes": self.bytes_used(), "max_bytes": self.policy.max_bytes, "max_events": self.policy.max_events}
-
 
 @dataclass(frozen=True)
 class BandwidthPolicy:
@@ -129,7 +79,6 @@ class BandwidthPolicy:
     def allowance(self, elapsed_seconds: float, tokens: int) -> int:
         if elapsed_seconds < 0: raise ValueError("elapsed_seconds cannot be negative")
         return min(self.burst_bytes, tokens + int(elapsed_seconds * self.bytes_per_second))
-
 
 class BandwidthAwareTransmitter:
     def __init__(self, policy: BandwidthPolicy | None = None): self.policy = policy or BandwidthPolicy(); self._tokens = self.policy.burst_bytes; self._last = _now()
@@ -144,14 +93,12 @@ class BandwidthAwareTransmitter:
             selected.append(record); used += size
         self._tokens -= used; return selected
 
-
 def batch_payload(records: Sequence[Mapping[str, Any]], *, tenant_id: str, sensor_id: str, batch_id: str) -> bytes:
     if not records: raise ValueError("batch cannot be empty")
     sequence = [int(r["sequence_no"]) for r in records]
     if sequence != sorted(sequence) or len(sequence) != len(set(sequence)): raise ValueError("batch sequence numbers must be strictly ordered")
     if any(r["tenant_id"] != tenant_id or r["sensor_id"] != sensor_id for r in records): raise ValueError("batch tenant or sensor mismatch")
-    return _canonical({"protocol_version": PROTOCOL_VERSION, "batch_id": batch_id, "tenant_id": tenant_id, "sensor_id": sensor_id, "first_sequence": sequence[0], "last_sequence": sequence[-1], "event_count": len(records), "events": [json.loads(bytes(r["payload"]).decode()) for r in records]})
-
+    return _canonical({"protocol_version": PROTOCOL_VERSION, "batch_id": batch_id, "tenant_id": tenant_id, "sensor_id": sensor_id, "first_sequence": sequence[0], "last_sequence": sequence[-1], "event_count": len(records), "events": [json.loads(bytes(r["payload"]).decode()) | {"sequence_no": int(r["sequence_no"])} for r in records]})
 
 class ReplayProtector:
     def __init__(self): self._batches: set[str] = set(); self._last: dict[tuple[str, str], int] = {}
@@ -164,21 +111,18 @@ class ReplayProtector:
         if previous and first_sequence > previous + 1: return "gap"
         self._batches.add(batch_id); self._last[key] = last_sequence; return "accepted"
 
-
 @dataclass(frozen=True)
 class SigningKey:
     key_id: str; algorithm: str; public_key_b64: str; created_at: str; not_before: str; not_after: str; revoked_at: str | None = None
 
-
 class EvidenceSigner:
     algorithm = "Ed25519"
-    def __init__(self, private_key: Ed25519PrivateKey | None = None):
-        self._private = private_key or Ed25519PrivateKey.generate(); public = self._private.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw); self.key_id = _sha256(public)[:32]; now = datetime.now(timezone.utc).isoformat(); self.metadata = SigningKey(self.key_id, self.algorithm, base64.b64encode(public).decode(), now, now, "9999-12-31T23:59:59+00:00")
+    def __init__(self, key_material: Ed25519PrivateKey | None = None):
+        self._private = key_material or Ed25519PrivateKey.generate(); public = self._private.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw); self.key_id = _sha256(public)[:32]; now = datetime.now(timezone.utc).isoformat(); self.metadata = SigningKey(self.key_id, self.algorithm, base64.b64encode(public).decode(), now, now, "9999-12-31T23:59:59+00:00")
     def sign(self, payload: bytes) -> str: return base64.b64encode(self._private.sign(payload)).decode()
     def export_private(self) -> bytes: return self._private.private_bytes(serialization.Encoding.Raw, serialization.PrivateFormat.Raw, serialization.NoEncryption())
     @classmethod
     def from_private_bytes(cls, data: bytes) -> "EvidenceSigner": return cls(Ed25519PrivateKey.from_private_bytes(data))
-
 
 def verify_signature(payload: bytes, signature_b64: str, key: SigningKey, *, at: datetime | None = None) -> bool:
     moment = at or datetime.now(timezone.utc)
@@ -186,7 +130,6 @@ def verify_signature(payload: bytes, signature_b64: str, key: SigningKey, *, at:
     if moment < datetime.fromisoformat(key.not_before) or moment > datetime.fromisoformat(key.not_after): return False
     try: Ed25519PublicKey.from_public_bytes(base64.b64decode(key.public_key_b64, validate=True)).verify(base64.b64decode(signature_b64, validate=True), payload); return True
     except (ValueError, InvalidSignature): return False
-
 
 def build_evidence_package(*, tenant_id: str, sensor_id: str, events: Sequence[SignalEvent], evidence: Sequence[Mapping[str, Any]] = (), provenance: Mapping[str, Any] | None = None, signer: EvidenceSigner) -> bytes:
     if not tenant_id or not sensor_id or not events: raise ValueError("tenant, sensor and events are required")
@@ -198,7 +141,6 @@ def build_evidence_package(*, tenant_id: str, sensor_id: str, events: Sequence[S
         for name, content in (("manifest.json", _canonical(manifest)), ("events.json", _canonical(records)), ("evidence.json", _canonical(list(evidence))), ("provenance.json", _canonical(dict(provenance or {}))), ("signing-key.json", _canonical(signer.metadata.__dict__))):
             info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0)); info.compress_type = zipfile.ZIP_DEFLATED; archive.writestr(info, content)
     return out.getvalue()
-
 
 def verify_evidence_package(package: bytes, trusted_keys: Mapping[str, SigningKey], *, tenant_id: str | None = None, at: datetime | None = None) -> dict[str, Any]:
     with zipfile.ZipFile(BytesIO(package), "r") as archive:
