@@ -1,36 +1,15 @@
 from datetime import datetime, timezone
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-from core.analyst import (
-    DetectionWorkflowRecord,
-    create_case_for_detection,
-    dispose,
-    inbox,
-    set_workflow,
-    timeline,
-)
+from core.analyst import create_case_for_detection, dispose, inbox, set_workflow, timeline
 from core.storage import ENGINE, DetectionRecord
 
 
 def _seed(tenant: str) -> int:
-    with ENGINE.begin() as conn:
-        # ORM tables are created by core.analyst on SQLite during test import.
-        pass
-    with __import__("sqlalchemy").orm.Session(ENGINE) as session:
-        row = DetectionRecord(
-            tenant_id=tenant,
-            subject="host-1",
-            source="test",
-            detected=1,
-            confidence="high",
-            score=0.91,
-            mitre_ttp="T1071",
-            evidence_json='{"signal":"fade"}',
-            correlation_id=str(uuid.uuid4()),
-            created_at=datetime.now(timezone.utc),
-        )
+    with Session(ENGINE) as session:
+        row = DetectionRecord(tenant_id=tenant, subject="host-1", source="test", detected=1, confidence="high", score=0.91, mitre_ttp="T1071", evidence_json='{"signal":"fade"}', correlation_id=str(uuid.uuid4()), created_at=datetime.now(timezone.utc))
         session.add(row); session.commit(); session.refresh(row)
         return row.id
 
