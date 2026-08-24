@@ -2,9 +2,9 @@
 
 **Program:** Enterprise Hardening  
 **Current release baseline:** v0.7.0  
-**Current group:** Group 11 — Detection Data Plane & Sensor Architecture  
-**Current build:** Builds 71–78  
-**Status:** GROUP 11 IMPLEMENTED — Phase 0 reconciliation in progress
+**Current group:** Group 12 — Multi-Domain Fade Correlation  
+**Current build:** Builds 83–90  
+**Status:** GROUP 12 IMPLEMENTED — repository validation green; production field validation not established
 
 ## Completed groups
 
@@ -19,54 +19,57 @@
 - Group 9 — ThreatFade Detection Science 2.0: ✅ Builds 53–62
 - Group 10 — Real-World Evidence & Validation Framework: ✅ Builds 63–70
 - Group 11 — Detection Data Plane & Sensor Architecture: ✅ Builds 71–78
+- Group 12 — Multi-Domain Fade Correlation: ✅ Builds 83–90
 
-## Group 11 — Detection Data Plane & Sensor Architecture
+## Group 12 — Multi-Domain Fade Correlation
 
 | Build | Deliverable | Status |
 |---|---|---|
-| 71 | Canonical immutable signal/packet/flow/session event schema | 🟢 |
-| 72 | Transport-agnostic live-sensor ingestion contract | 🟢 |
-| 73 | Bounded ingestion queue with explicit backpressure/drop metrics | 🟢 |
-| 74 | Tenant-bound sensor identity and lifecycle registry | 🟢 |
-| 75 | Active/revoked sensor admission control | 🟢 |
-| 76 | Deterministic event canonicalization and SHA-256 integrity digest | 🟢 |
-| 77 | Reference endpoint/edge sensor adapter without privileged capture side effects | 🟢 |
-| 78 | Group 11 architecture gate and regression suite | 🟢 |
+| 83 | Reusable domain-agnostic correlation event model | 🟢 |
+| 84 | Deterministic temporal correlation engine | 🟢 |
+| 85 | GNSS disruption ↔ network fade/C2 correlation detection pack | 🟢 |
+| 86 | Evidence custody and multi-domain confidence integration | 🟢 |
+| 87 | Governed reproducible correlation validation corpus | 🟢 |
+| 88 | False-positive, missing-telemetry, clock-skew, duplicate/out-of-order and adversarial validation | 🟢 |
+| 89 | Correlation evidence dashboard visualization | 🟢 |
+| 90 | Documentation and claim reconciliation | 🟢 |
 
-### Group 11 implementation evidence
+### Group 12 implementation evidence
 
-- `core/data_plane.py`
-- `agents/sensor.py`
-- `tests/test_data_plane.py`
-- `scripts/validate_data_plane.py`
-- `.github/workflows/group11-data-plane.yml`
-- `docs/GROUP_11_DATA_PLANE.md`
+- `core/correlation.py`
+- `core/correlation_detection_pack.py`
+- `tests/test_correlation.py`
+- `validation/correlation_corpus.json`
+- `benchmarks/correlation_validation.py`
+- `dashboard/correlation.html`
+- `docs/phase-1-correlation.md`
+- `CHANGELOG.md`
+- `docs/BUILD_STATUS.md`
+- `components/detection/correlation-evidence-view.tsx` in the public web repository
 
-### Group 11 acceptance gate
+### Group 12 acceptance gate
 
-- [x] A single versioned event schema is used for packet, flow, session and signal observations.
-- [x] Events require timezone-aware observation timestamps and bounded metadata.
-- [x] Canonical serialization is deterministic and SHA-256 integrity digests are available.
-- [x] Ingestion is bounded and exposes accepted/dropped/depth metrics instead of silently growing memory.
-- [x] Sensor identities are cryptographically fingerprinted and cannot be rebound across tenants.
-- [x] Sensors must be explicitly active before they can emit events.
-- [x] Revoked/draining sensors cannot ingest new events.
-- [x] The reference adapter is transport-agnostic and does not execute shell commands or open raw sockets.
-- [x] Tenant identity is bound to the registered sensor rather than caller-supplied event metadata.
-- [x] Data-plane controls have dedicated regression coverage and a fail-closed architecture gate.
-- [ ] Hosted CI, security and supply-chain workflows are green for the final Phase 0 branch head.
+- [x] Correlation consumes canonical `SignalEvent` data through a reusable observation abstraction.
+- [x] Correlation policy explicitly defines the temporal window, clock-skew tolerance, signal threshold and minimum domain requirements.
+- [x] Correlation is deterministic for equivalent inputs.
+- [x] Duplicate events do not increase correlation strength.
+- [x] Out-of-order events are normalized without silently changing observation identity.
+- [x] Missing domains prevent a multi-domain detection rather than being treated as corroboration.
+- [x] Sensor confidence and uncertainty reduce effective evidence strength.
+- [x] Cross-tenant observations cannot be correlated.
+- [x] Conflicting and weak observations do not produce unsupported confidence.
+- [x] Correlated detections preserve source event IDs, event digests and evidence provenance.
+- [x] Results explicitly identify the finding as `observed_correlation` and `causal_attribution=not_established`.
+- [x] GNSS/network correlation is implemented as a detection pack over the generic correlation engine rather than hard-coded into the engine.
+- [x] Reproducible synthetic validation covers positive and negative temporal cases.
+- [x] Robustness tests cover missing telemetry, clock skew, duplicate events, out-of-order events, uncertainty and cross-tenant input.
+- [x] Dashboard visualization distinguishes observed correlation from causal attribution and does not present illustrative data as live telemetry.
+- [x] Documentation reconciles implementation status with the evidence boundary.
+- [x] FusionOps contracts remain unchanged.
+- [ ] Independent field validation / customer-scale false-positive and false-negative measurement.
+- [ ] Production GNSS jamming/spoofing classification validation.
 
-## Phase 0 — Repository Truth & Release Reconciliation
-
-### Evidence-backed findings
-
-- `CHANGELOG.md` identifies `0.7.0` as the current release baseline.
-- The latest main commit is Group 11 and is signed/verified by GitHub.
-- Group 10 and Group 11 are present as concrete commits with dedicated CI workflows and tests.
-- `requirements.txt` has been reconciled on the Phase 0 branch to the Dependabot floors for `scikit-learn>=1.9.0` and `opentelemetry-api>=1.44.0`.
-- The two corresponding Dependabot PRs are stale/non-mergeable against the current main baseline, so their equivalent changes are being validated directly rather than force-merging stale heads.
-
-### Capability truth
+## Capability truth
 
 | Capability | Repository status | Production-validation status |
 |---|---|---|
@@ -76,20 +79,19 @@
 | Governed evaluation corpus | Implemented as evaluation infrastructure | Real-world independent corpus validation remains external |
 | Evidence / validation framework | Implemented | Independent detection validation remains external |
 | Detection data plane | Implemented as transport-agnostic primitives | Production sensor fleet not yet established |
-| Production live packet capture | Not established by Group 11 | Not production validated |
-| GNSS ↔ network multi-domain correlation | Not yet implemented as a correlation capability | Not validated |
+| GNSS ↔ network multi-domain correlation | Implemented | Repository validation present; field validation not established |
 | Durable store-and-forward evidence transport | Not yet implemented | Not validated |
 | Production SOC analyst workflow | Partial platform foundation | End-to-end workflow requires further validation |
 | Endpoint/edge production deployment | Partial architecture | Platform-specific deployment not yet validated |
 
 ## Verification boundary
 
-Group 11 introduces the canonical data-plane contract and sensor lifecycle controls. It does **not** claim that a production packet-capture implementation, sensor fleet rollout, or customer-scale throughput has been independently validated.
+Group 12 establishes a reusable temporal multi-domain correlation capability and a GNSS/network implementation over that abstraction. It does **not** establish causal attribution, prove that GNSS interference was malicious, classify jamming versus spoofing, or provide customer-scale field false-positive/false-negative rates.
 
-Repository tests and deterministic CI gates are engineering evidence, not universal accuracy guarantees, independent penetration testing, certification, customer-scale performance evidence or contractual assurance.
+Repository tests, synthetic corpora and deterministic CI gates are engineering evidence. They are not substitutes for independent field validation, independent penetration testing, certification, customer-scale performance evidence or contractual assurance.
 
 ## Next planned group
 
-**Group 12 — Production SOC / Analyst Platform.**
+**Group 13 — Resilient Offline Evidence.**
 
-Focus: detection inbox, investigation workspace, entity correlation, case-management completion, analyst feedback and end-to-end detection-to-disposition workflow.
+Focus: durable store-and-forward transport, bandwidth-aware delivery, replay-safe/idempotent ingestion, signed offline evidence bundles and portable verification while preserving tenant isolation and evidence integrity.

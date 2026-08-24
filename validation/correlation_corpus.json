@@ -1,0 +1,31 @@
+{
+  "corpus_id": "TF-CORRELATION-001",
+  "version": "1.0.0",
+  "purpose": "Deterministic validation of multi-domain temporal corroboration without malware payloads.",
+  "methodology": {
+    "window_seconds": 30,
+    "minimum_signal_score": 0.5,
+    "confidence_threshold": 0.65,
+    "required_domains": ["gnss", "network"],
+    "causal_claim": "not_established"
+  },
+  "cases": [
+    {"case_id":"positive-001","scenario":"aligned-gnss-network","expected_detection":true,"gnss_offset_s":10,"network_offset_s":14,"gnss_score":0.9,"network_score":0.9},
+    {"case_id":"positive-002","scenario":"aligned-gnss-network","expected_detection":true,"gnss_offset_s":5,"network_offset_s":8,"gnss_score":0.8,"network_score":0.9},
+    {"case_id":"negative-001","scenario":"temporal-separation","expected_detection":false,"gnss_offset_s":0,"network_offset_s":31,"gnss_score":0.9,"network_score":0.9},
+    {"case_id":"negative-002","scenario":"weak-gnss","expected_detection":false,"gnss_offset_s":10,"network_offset_s":12,"gnss_score":0.2,"network_score":0.9},
+    {"case_id":"negative-003","scenario":"missing-network","expected_detection":false,"gnss_offset_s":10,"network_offset_s":null,"gnss_score":0.9,"network_score":null},
+    {"case_id":"negative-004","scenario":"missing-gnss","expected_detection":false,"gnss_offset_s":null,"network_offset_s":10,"gnss_score":null,"network_score":0.9}
+  ],
+  "provenance": {
+    "data_type": "synthetic metadata only",
+    "payloads": false,
+    "split": "blind",
+    "limitations": [
+      "Synthetic cases do not establish field accuracy.",
+      "GNSS disruption is not equivalent to intentional jamming or spoofing.",
+      "Temporal correlation does not establish causality.",
+      "Independent labeled multi-sensor field data remains required for production assurance."
+    ]
+  }
+}

@@ -2,6 +2,25 @@
 
 All notable changes to ThreatFade will be documented in this file.
 
+## Unreleased — Phase 1 Multi-Domain Fade Correlation
+
+### Added
+- Reusable `CorrelationObservation` model over canonical `SignalEvent` data.
+- Deterministic temporal multi-domain correlation engine with explicit window, clock-skew tolerance, signal thresholds and confidence policy.
+- Tenant isolation, duplicate-event suppression and out-of-order normalization in correlation processing.
+- `TF-CORR-001` generic multi-domain correlation detection rule.
+- `TF-GNSS-CORR-001` GNSS disruption ↔ network fade/C2 correlation pack.
+- Evidence hashing and evidence-custody records for correlated detections.
+- Synthetic governed validation corpus and reproducible correlation benchmark.
+- Adversarial tests for missing telemetry, temporal separation, weak signals, duplicate/out-of-order events, uncertainty and cross-tenant input.
+- Correlation evidence visualization in the reference dashboard and public web repository.
+- Phase 1 architecture and validation-boundary documentation.
+
+### Evidence boundary
+- Phase 1 is **implemented — not yet production validated**.
+- Correlation results are explicitly labeled `observed_correlation` and `causal_attribution=not_established`.
+- Synthetic validation does not establish field false-positive/false-negative rates, GNSS jamming/spoofing classification accuracy, causality or customer-scale performance.
+
 ## [0.7.0] – 2026-08-22
 
 ### Secure Deployment, Supply Chain & Production Operations
