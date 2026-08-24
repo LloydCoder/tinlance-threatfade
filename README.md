@@ -2,7 +2,7 @@
 
 **Evasion Interception Platform** by Tinlance Limited.
 
-ThreatFade detects moments when adversaries intentionally reduce observable signals—including C2 quieting, gradual living-off-the-land activity reduction and GNSS interference—using entropy analysis, statistical deviation, heuristic detection, confidence scoring, optional ML anomaly detection, ATT&CK mapping, interoperable exports and operational integrations.
+ThreatFade detects moments when adversaries intentionally reduce observable signals—including C2 quieting, gradual living-off-the-land activity reduction and GNSS interference—using entropy analysis, statistical deviation, heuristic detection, confidence scoring, optional ML anomaly detection, multi-domain temporal correlation, ATT&CK mapping, interoperable exports and operational integrations.
 
 **Status:** v0.7.0 — enterprise engineering baseline  
 **License:** Apache 2.0 (open-core)
@@ -30,6 +30,7 @@ The current UX includes:
 - Investigation drawer with structured evidence, confidence, z-outlier, score and ATT&CK context.
 - Analyst disposition actions and an explicit investigation workflow.
 - Detection simulation controls for C2 quieting, LOTL gradual fade, GNSS jamming, normal-with-fade and mixed scenarios.
+- Multi-domain correlation evidence visualization with explicit temporal window and clock-tolerance context.
 - Optional ML anomaly layer.
 - API health/readiness and operational posture signals.
 - Validation posture showing repository evidence separately from external assurance.
@@ -87,11 +88,14 @@ Users / SIEM ── TLS / Edge ── ThreatFade Control Plane
                                 │
                     Detection + Evidence Engine
                                 │
-          ┌─────────────────────┼────────────────────┐
-          │                     │                    │
-       Postgres             Object/export        Telemetry
-          │                     │                    │
-          └─────────────── Analyst Console ──────────┘
+              ┌─────────────────┼─────────────────┐
+              │                 │                 │
+        Domain observations  Temporal         Evidence +
+        (network/GNSS/...)  correlation       confidence
+              │                 │                 │
+              └─────────────────┼─────────────────┘
+                                │
+          Postgres / object-export / telemetry / analyst console
                                 │
                 JSON / Sigma / STIX / SIEM / FusionOps
 ```
@@ -104,14 +108,17 @@ The implementation separates control-plane concerns from detection workloads. De
 Signal / PCAP
   → signal extraction
   → rolling entropy + statistical deviation
-  → detection rules
-  → optional ML anomaly layer
+  → domain-specific detection rules
+  → canonical SignalEvent
+  → optional temporal multi-domain correlation
   → confidence + structured evidence
   → ATT&CK mapping
   → JSON / SIEM / Sigma / STIX 2.1 / FusionOps
   → tenant-scoped durable record + audit event
   → analyst investigation / disposition
 ```
+
+Multi-domain correlation is implemented as a reusable, domain-agnostic temporal layer. GNSS disruption ↔ network fade/C2 is the first detection-pack implementation. Correlation results are explicitly **observed temporal association**, not causal attribution.
 
 ## Detection capabilities
 
@@ -120,6 +127,8 @@ Signal / PCAP
 - Rolling Shannon entropy.
 - Z-score anomaly detection.
 - C2, LOTL and GNSS fade scenarios.
+- Reusable temporal multi-domain correlation.
+- GNSS disruption ↔ network fade/C2 correlation detection pack.
 - Optional Isolation Forest anomaly layer.
 - Structured evidence and confidence scoring.
 - Alert deduplication.
@@ -133,7 +142,7 @@ Detection packs use stable IDs, semantic versions, descriptions and ATT&CK mappi
 
 **Research → Backtest → Canary → Production → Deprecated**
 
-Core rules include `TF-C2-001`, `TF-LOTL-001` and `TF-GNSS-001`.
+Core rules include `TF-C2-001`, `TF-LOTL-001`, `TF-GNSS-001` and `TF-GNSS-CORR-001`.
 
 ## Enterprise identity and tenancy
 
@@ -202,9 +211,12 @@ Run:
 
 ```bash
 python benchmarks/benchmark.py
+python benchmarks/correlation_validation.py
 ```
 
 The deterministic benchmark is intentionally separate from real-PCAP validation. The repository records author-confirmed validation against Merlin QUIC C2, Cobalt Strike and IcedID and the documented 0% false-positive baseline across five normal traffic patterns and 100 test runs. These are project validation results—not universal accuracy guarantees.
+
+Phase 1 adds a governed synthetic correlation corpus covering positive/negative temporal relationships, weak signals, missing telemetry and ordering/duplication conditions. This validates deterministic implementation behavior; it does **not** establish field false-positive/false-negative rates, GNSS jamming/spoofing classification accuracy, causal attribution or customer-scale performance.
 
 Independent labeled corpora, third-party penetration testing, purple-team exercises and customer-scale load testing are external assurance activities and are not represented as completed merely because repository tests pass.
 
@@ -224,6 +236,7 @@ Production teams should measure:
 - Queue depth/backpressure where a distributed deployment is used.
 - Backup/restore results.
 - Recovery time and recovery point performance.
+- Correlation latency, clock-skew tolerance and missing-domain rates where multi-domain correlation is deployed.
 
 The readiness endpoint exposes configured SLO targets. Targets are **targets**, not guarantees; production evidence is required before publishing measured SLOs.
 
@@ -254,6 +267,8 @@ The following cannot be honestly self-certified by a repository:
 - Customer-scale performance guarantees.
 - Data-residency commitments.
 - Organization-level incident-response obligations.
+- Causal attribution of correlated GNSS/network events.
+- Field-validated GNSS jamming/spoofing classification.
 
 Those require organizational controls, evidence, contracts and/or independent assessment.
 
@@ -263,6 +278,7 @@ Those require organizational controls, evidence, contracts and/or independent as
 python -m compileall -q .
 pytest -q
 python benchmarks/benchmark.py
+python benchmarks/correlation_validation.py
 python -c "from core.detection_pack import detection_pack, validate_pack; validate_pack(detection_pack()); print('detection pack: OK')"
 python scripts/enterprise_smoke.py
 ```
@@ -276,7 +292,7 @@ ThreatFade/
 ├── agents/             # signal-generation and endpoint components
 ├── api.py              # FastAPI control/data-plane boundary
 ├── benchmarks/         # reproducible validation
-├── core/               # detection, security, storage, evidence and observability
+├── core/               # detection, correlation, security, storage, evidence and observability
 ├── dashboard/          # ThreatFade Dashboard / analyst console
 ├── docs/               # enterprise, threat-model and architecture documentation
 ├── integrations/       # external operational integrations
@@ -284,6 +300,7 @@ ThreatFade/
 ├── reports/            # generated validation/interoperability outputs
 ├── scripts/             # enterprise smoke and operational tooling
 ├── tests/               # unit/integration/security coverage
+├── validation/          # governed validation corpora
 ├── Dockerfile
 ├── docker-compose.yml
 └── .github/workflows/   # CI and security gates
@@ -291,7 +308,11 @@ ThreatFade/
 
 ## Release truth
 
-The current release baseline is **v0.7.0**, corresponding to the completed enterprise-hardening Groups 1–11 documented in `docs/BUILD_STATUS.md`. Group 11 establishes the canonical detection data-plane and sensor lifecycle architecture; it does not by itself prove production live packet capture, durable store-and-forward transport, multi-domain GNSS/network correlation, customer-scale throughput or independent detection validation.
+The current release baseline remains **v0.7.0**. Groups 1–11 established the enterprise-hardening and canonical detection data-plane baseline. Group 12 adds reusable multi-domain temporal correlation and the first GNSS/network correlation pack.
+
+Group 12 is **implemented with repository-level validation**, but it is not represented as independent production validation. In particular, the repository does not claim causal attribution, malicious GNSS interference classification, customer-scale correlation performance or field false-positive/false-negative rates.
+
+See `docs/BUILD_STATUS.md` for the evidence-backed implementation and validation boundary.
 
 ## License
 
