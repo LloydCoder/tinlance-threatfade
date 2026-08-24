@@ -1,0 +1,14 @@
+title = "ThreatFade Gitleaks configuration"
+
+[extend]
+useDefault = true
+
+# The initial Phase 2 implementation commit contained a generic-api-key false
+# positive on a Python constructor parameter. The current constructor uses the
+# explicit `key_material` name, but Gitleaks' entropy rule still classifies the
+# type annotation as a secret. No credential material is present.
+[allowlist]
+description = "Phase 2 historical generic-api-key false positive"
+commits = ["1a0e28ee487b3044b16e4d523cbeb7b8f96238e0"]
+regexTarget = "line"
+regexes = ["^\\s*def __init__\\(self, key_material: Ed25519PrivateKey \\| None = None\\):\\s*$"]

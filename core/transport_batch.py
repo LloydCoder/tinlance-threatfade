@@ -1,0 +1,68 @@
+"""Signed transport envelopes for store-and-forward ingestion."""
+from __future__ import annotations
+
+import base64
+import json
+from dataclasses import dataclass
+from typing import Any, Mapping, Sequence
+
+from .offline_transport import EvidenceSigner, SigningKey, _canonical, batch_payload, verify_signature
+from .transport_protocol import DurableReplayLedger
+
+
+@dataclass(frozen=True)
+class SignedBatch:
+    batch_id: str
+    tenant_id: str
+    sensor_id: str
+    first_sequence: int
+    last_sequence: int
+    payload_b64: str
+    signature_b64: str
+    signing_key_id: str
+
+    def canonical(self) -> bytes:
+        return _canonical(self.__dict__)
+
+
+def _sequenced_records(records: Sequence[Mapping[str, Any]], *, tenant_id: str, sensor_id: str) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    for record in records:
+        payload = json.loads(bytes(record["payload"]).decode())
+        payload["sequence_no"] = int(record["sequence_no"])
+        normalized.append({**record, "tenant_id": tenant_id, "sensor_id": sensor_id, "payload": _canonical(payload)})
+    return normalized
+
+
+def sign_batch(records: Sequence[Mapping[str, Any]], *, tenant_id: str, sensor_id: str, batch_id: str, signer: EvidenceSigner) -> SignedBatch:
+    normalized = _sequenced_records(records, tenant_id=tenant_id, sensor_id=sensor_id)
+    payload = batch_payload(normalized, tenant_id=tenant_id, sensor_id=sensor_id, batch_id=batch_id)
+    decoded = json.loads(payload)
+    return SignedBatch(batch_id=batch_id, tenant_id=tenant_id, sensor_id=sensor_id, first_sequence=decoded["first_sequence"], last_sequence=decoded["last_sequence"], payload_b64=base64.b64encode(payload).decode(), signature_b64=signer.sign(payload), signing_key_id=signer.key_id)
+
+
+def verify_and_accept_batch(batch: SignedBatch, *, trusted_key: SigningKey, replay_ledger: DurableReplayLedger, expected_tenant: str, expected_sensor: str) -> str:
+    if batch.tenant_id != expected_tenant or batch.sensor_id != expected_sensor:
+        raise ValueError("tenant or sensor mismatch")
+    if batch.signing_key_id != trusted_key.key_id:
+        raise ValueError("signing key mismatch")
+    try:
+        payload = base64.b64decode(batch.payload_b64, validate=True)
+        decoded = json.loads(payload)
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("invalid batch payload") from exc
+    if decoded.get("batch_id") != batch.batch_id or decoded.get("tenant_id") != batch.tenant_id or decoded.get("sensor_id") != batch.sensor_id:
+        raise ValueError("batch envelope mismatch")
+    if decoded.get("first_sequence") != batch.first_sequence or decoded.get("last_sequence") != batch.last_sequence:
+        raise ValueError("batch sequence metadata mismatch")
+    events = decoded.get("events")
+    if not isinstance(events, list) or decoded.get("event_count") != len(events):
+        raise ValueError("batch event count mismatch")
+    sequences = [e.get("sequence_no") for e in events if isinstance(e, dict)]
+    if len(sequences) != len(events) or sequences != list(range(batch.first_sequence, batch.last_sequence + 1)):
+        raise ValueError("batch event sequence mismatch")
+    if any(e.get("tenant_id") != batch.tenant_id or e.get("sensor_id") != batch.sensor_id for e in events):
+        raise ValueError("batch event identity mismatch")
+    if not verify_signature(payload, batch.signature_b64, trusted_key):
+        raise ValueError("batch signature verification failed")
+    return replay_ledger.accept(batch_id=batch.batch_id, tenant_id=batch.tenant_id, sensor_id=batch.sensor_id, first_sequence=batch.first_sequence, last_sequence=batch.last_sequence)
