@@ -40,6 +40,7 @@
 
 - `agents/sensor_runtime.py`
 - `agents/live_capture.py`
+- `agents/detection_pipeline.py`
 - `agents/windows_sensor.py`
 - `agents/edge_runtime.py`
 - `agents/durable_queue.py`
@@ -47,12 +48,15 @@
 - `deploy/systemd/threatfade-sensor.service`
 - `benchmarks/sensor_runtime.py`
 - `tests/test_sensor_runtime.py`
+- `tests/test_detection_pipeline.py`
 
 ## Architecture and security boundary
 
 The sensor path remains aligned with the Group 11 contract:
 
-`capture → canonical SignalEvent → bounded durable queue → detection/transport`
+`capture → canonical SignalEvent → existing fade engine adapter → bounded durable queue → detection/transport`
+
+The streaming detection adapter reuses `core.fade_engine.detect_fade`; it does not create a parallel detector. Session windows are bounded and keyed by tenant, sensor and flow identity.
 
 Capture privilege is isolated to the platform adapter. Linux deployment uses a dedicated service account and bounds the service to `CAP_NET_RAW`; no `CAP_NET_ADMIN` or broad root execution is required by the reference service. eBPF is not enabled by default because the current ThreatFade packet path does not require kernel-side filtering; it remains an optional future acceleration adapter.
 
@@ -66,7 +70,7 @@ Sensor identity is bound to a tenant at enrollment and revoked sensors cannot in
 
 Build 114 measures the canonical-event + durable-queue path and reports events/sec, elapsed time, queue depth and host information. It is not a NIC line-rate benchmark and does not justify a 1M+ packets/sec claim. Real packet-loss, sustained-duration and hardware-specific capture benchmarks require execution on the target host/NIC with libpcap/AF_PACKET or Npcap.
 
-No causal security claim is inferred from the existence of a live sensor. Repository tests prove schema, tenant binding, bounded storage, offline replay and lifecycle behavior; field deployment validation remains distinct.
+Repository tests validate canonical event conversion, bounded storage, offline replay, tenant isolation, sensor lifecycle and streaming handoff to the existing fade engine. They do not constitute field validation of packet loss, sustained throughput, kernel behavior or Windows driver installation.
 
 ## Next planned group
 
