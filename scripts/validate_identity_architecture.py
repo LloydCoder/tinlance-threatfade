@@ -21,6 +21,7 @@ REQUIRED = {
     "redirect refusal": "allow_redirects=False",
     "session validation": "validate_session(session_token, principal.subject)",
     "random session token": "secrets.token_urlsafe(32)",
+    "verified invitation email": "principal.claims.get(\"email\")",
 }
 
 
@@ -30,11 +31,20 @@ def fail(message: str) -> None:
 
 def main() -> None:
     for name, marker in REQUIRED.items():
-        haystack = ENTERPRISE if name not in {"random session token"} and not name.startswith("session") else IDENTITY
+        if name == "random session token":
+            haystack = IDENTITY
+        elif name == "verified invitation email":
+            haystack = ROUTES
+        else:
+            haystack = ENTERPRISE
         if marker not in haystack:
             fail(f"missing {name}: {marker}")
     if "Authorization" not in ROUTES or "organization_create" not in ROUTES:
         fail("identity routes are not mounted")
+    if "class InvitationAccept" not in ROUTES or "email:" in ROUTES.split("class InvitationAccept", 1)[1].split("@router.post", 1)[0]:
+        fail("invitation acceptance accepts caller-supplied email instead of verified identity")
+    if 'payload.email' in ROUTES.split('@router.post("/invitations/accept")', 1)[1].split('@router.patch', 1)[0]:
+        fail("invitation acceptance trusts a caller-supplied email")
     if 'authorization.startswith("Bearer ")' in ENTERPRISE:
         fail("legacy case-sensitive Bearer parser remains")
     if 'requested != principal.tenant_id and "admin" not in principal.roles' in ENTERPRISE:
