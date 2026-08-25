@@ -66,5 +66,4 @@ jobs:
         run: |
           python scripts/validate_phase2.py
           python scripts/validate_enterprise_integrations.py
-          python scripts/validate_environment_profiles.py 2>/dev/null || true
-          echo 'ThreatFade Phases 1-6 validation completed.'
+          python scripts/validate_environment_profile.py
