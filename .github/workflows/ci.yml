@@ -111,7 +111,7 @@ jobs:
         run: python benchmarks/phase7_benchmark.py --target-pps ${{ matrix.target_pps }} --duration 10 --output phase7-${{ matrix.target_pps }}.json
       - name: Upload benchmark result
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: phase7-${{ matrix.target_pps }}
           path: phase7-${{ matrix.target_pps }}.json
