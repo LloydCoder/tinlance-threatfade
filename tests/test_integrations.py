@@ -1,17 +1,12 @@
 from datetime import datetime, timezone
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import threading
 
 import pytest
 
 from core.integrations import (
-    ADAPTERS,
-    Credential,
-    DeliveryState,
-    DeliveryAudit,
-    IntegrationConfig,
-    IntegrationEvent,
-    IntegrationTransport,
-    MemoryDeadLetterSink,
-    RetryPolicy,
+    ADAPTERS, Credential, DeliveryState, DeliveryAudit, IntegrationConfig,
+    IntegrationEvent, IntegrationTransport, MemoryDeadLetterSink, RetryPolicy,
     StaticCredentialProvider,
 )
 
@@ -57,9 +52,7 @@ def test_all_requested_adapters_share_one_registry():
 
 
 def test_normalized_event_has_deterministic_idempotency_key():
-    first = event()
-    second = event()
-    assert first.idempotency_key == second.idempotency_key
+    assert event().idempotency_key == event().idempotency_key
 
 
 def test_success_is_idempotent_and_does_not_repost():
@@ -92,7 +85,7 @@ def test_non_retryable_failure_goes_dead_letter():
 
 
 def test_network_failure_is_bounded_and_audited():
-    session = FakeSession([OSError("network down"), OSError("network down"), OSError("network down")])
+    session = FakeSession([OSError("network down")] * 3)
     audit = DeliveryAudit()
     transport = IntegrationTransport(session=session, audit=audit, sleeper=lambda _: None)
     result = transport.deliver(event(), config())
@@ -100,6 +93,36 @@ def test_network_failure_is_bounded_and_audited():
     assert result.attempts == 3
     assert audit.records[-1]["event_id"] == "evt-1"
     assert "secret" not in str(audit.records)
+
+
+def test_real_http_mock_server_round_trip():
+    seen = {}
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):  # noqa: N802
+            seen["path"] = self.path
+            seen["headers"] = dict(self.headers)
+            seen["body"] = self.rfile.read(int(self.headers["Content-Length"]))
+            self.send_response(202)
+            self.end_headers()
+
+        def log_message(self, *_args):
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        cfg = config(endpoint=f"http://127.0.0.1:{server.server_port}/ingest")
+        result = IntegrationTransport(sleeper=lambda _: None).deliver(event(), cfg)
+        assert result.state is DeliveryState.DELIVERED
+        assert seen["path"] == "/ingest"
+        assert seen["headers"]["Idempotency-Key"] == event().idempotency_key
+        assert b"tenant-a" in seen["body"]
+    finally:
+        server.shutdown()
+        thread.join(timeout=2)
+        server.server_close()
 
 
 def test_tenant_identity_is_in_payload():
