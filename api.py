@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from agents.signal_generator import generate_signals
+from core.analyst_api import router as analyst_router
 from core.api_security import enforce_rate_limit, read_limited_upload, validate_pcap_upload
 from core.enterprise import AUDIT, authenticate, authorize, require_tenant, slo_targets
 from core.explainability import build_evidence
@@ -35,7 +36,8 @@ if ENVIRONMENT == "production" and "*" in allowed_origins:
     raise RuntimeError("Wildcard CORS is forbidden in production")
 
 app = FastAPI(title="ThreatFade API", description="Evasion Interception Platform", version=CONFIG["branding"]["version"], docs_url="/docs", redoc_url="/redoc")
-app.add_middleware(CORSMiddleware, allow_origins=allowed_origins, allow_methods=["GET", "POST"], allow_headers=["Content-Type", "X-API-Key", "Authorization", "X-Request-ID", "X-Tenant-ID"])
+app.include_router(analyst_router)
+app.add_middleware(CORSMiddleware, allow_origins=allowed_origins, allow_methods=["GET", "POST", "PATCH"], allow_headers=["Content-Type", "X-API-Key", "Authorization", "X-Request-ID", "X-Tenant-ID"])
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -53,7 +55,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-        response.headers["Cache-Control"] = "no-store" if request.url.path.startswith(("/detect", "/detections")) else "no-cache"
+        response.headers["Cache-Control"] = "no-store" if request.url.path.startswith(("/detect", "/detections", "/enterprise/analyst")) else "no-cache"
         if ENVIRONMENT == "production":
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
             response.headers["Content-Security-Policy"] = "default-src 'self'; frame-ancestors 'none'; base-uri 'self'"
