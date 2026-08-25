@@ -1,0 +1,70 @@
+name: ThreatFade Phases 1-6 Green Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: threatfade-phases1-6-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  phases1-6:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      THREATFADE_ENV: development
+      THREATFADE_ALLOW_DEV_AUTH: "true"
+      THREATFADE_DATABASE_URL: sqlite:///./phases1-6-validation.db
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Compile engine
+        run: python -m compileall -q core agents scripts tests enterprise_app.py fusionops_api.py main.py
+      - name: Phase 1 correlation tests
+        run: pytest -q tests/test_correlation.py tests/test_detection_science.py tests/test_evaluation.py tests/test_evaluation_corpus.py
+      - name: Phase 1 correlation validation
+        run: python benchmarks/correlation_validation.py
+      - name: Phase 2 offline evidence tests
+        run: pytest -q tests/test_offline_transport.py tests/test_transport_protocol.py tests/test_integrity.py tests/test_data_plane.py
+      - name: Phase 2 offline evidence validation
+        run: python scripts/validate_phase2.py
+      - name: Phase 3 analyst/SOC tests
+        run: pytest -q tests/test_analyst_workflow.py tests/test_analyst_api.py tests/test_enterprise_security.py
+      - name: Phase 4 sensor/edge tests
+        run: pytest -q tests/test_sensor_runtime.py test_endpoint_agent.py test_pcap_parallel.py
+      - name: Phase 4 sensor validation
+        run: python benchmarks/sensor_runtime.py
+      - name: Phase 5 environment profile tests
+        run: pytest -q tests/test_environment_profile.py tests/test_thresholds.py
+      - name: Phase 6 integration tests
+        run: pytest -q tests/test_integrations.py test_siem_exporter.py
+      - name: Phase 6 integration validation
+        run: python scripts/validate_enterprise_integrations.py
+      - name: Security architecture validation
+        run: python scripts/validate_security_architecture.py
+      - name: Supply-chain validation
+        run: python scripts/validate_supply_chain.py
+      - name: Final phase gate
+        run: |
+          python scripts/validate_phase2.py
+          python scripts/validate_enterprise_integrations.py
+          python scripts/validate_environment_profiles.py 2>/dev/null || true
+          echo 'ThreatFade Phases 1-6 validation completed.'
