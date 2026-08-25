@@ -1,10 +1,10 @@
 # ThreatFade Enterprise Build Status
 
 **Program:** Enterprise Hardening  
-**Current release baseline:** v0.7.0  
-**Current group:** Group 14 — Analyst Investigation & Operational Workflow  
-**Current build:** Builds 98–107  
-**Status:** GROUP 14 IMPLEMENTED — repository validation pending
+**Current release baseline:** v0.8.0-dev  
+**Current group:** Group 15 — Production Sensor / Edge Runtime  
+**Current build:** Builds 108–114  
+**Status:** GROUP 15 IMPLEMENTED — repository validation pending
 
 ## Completed groups
 
@@ -21,66 +21,57 @@
 - Group 11 — Detection Data Plane & Sensor Architecture: ✅ Builds 71–78
 - Group 12 — Multi-Domain Fade Correlation: ✅ Builds 83–90
 - Group 13 — Resilient Offline Evidence: ✅ Builds 91–97
-- Group 14 — Analyst Investigation & Operational Workflow: 🟡 Builds 98–107 — validation pending
+- Group 14 — Analyst Investigation & Operational Workflow: 🟢 Builds 98–107
+- Group 15 — Production Sensor / Edge Runtime: 🟡 Builds 108–114 — validation pending
 
-## Group 14 — Analyst Investigation & Operational Workflow
+## Group 15 — Production Sensor / Edge Runtime
 
 | Build | Deliverable | Status |
 |---|---|---|
-| 98 | Detection inbox | 🟢 |
-| 99 | Fade investigation workspace | 🟢 |
-| 100 | Evidence timeline | 🟢 |
-| 101 | Entity correlation | 🟢 |
-| 102 | Network/session explorer | 🟢 |
-| 103 | Case management integration | 🟢 |
-| 104 | Analyst disposition | 🟢 |
-| 105 | Analyst feedback/workflow history | 🟢 |
-| 106 | Secure engine/web boundary for analyst operations | 🟢 |
-| 107 | End-to-end detection-to-disposition workflow | 🟢 implementation; validation pending |
+| 108 | Linux sensor runtime | 🟢 implementation |
+| 109 | Production live-capture adapter | 🟢 implementation |
+| 110 | Windows/Npcap sensor architecture | 🟢 implementation boundary |
+| 111 | Offline-first edge runtime | 🟢 implementation |
+| 112 | Durable store-and-forward integration | 🟢 implementation |
+| 113 | Sensor fleet lifecycle facade | 🟢 implementation |
+| 114 | Reproducible sensor-path benchmark | 🟢 implementation; measured run pending |
 
-## Group 14 implementation evidence
+## Group 15 implementation evidence
 
-- `core/analyst.py`
-- `core/analyst_routes.py`
-- `enterprise_app.py`
-- `alembic/versions/20260824_0004_analyst_workflow.py`
-- `tests/test_analyst_workflow.py`
-- `app/soc/page.tsx`
-- `app/soc/[id]/page.tsx`
-- `app/soc/[id]/timeline/page.tsx`
-- `app/api/analyst/[...path]/route.ts`
+- `agents/sensor_runtime.py`
+- `agents/live_capture.py`
+- `agents/detection_pipeline.py`
+- `agents/windows_sensor.py`
+- `agents/edge_runtime.py`
+- `agents/durable_queue.py`
+- `agents/fleet.py`
+- `deploy/systemd/threatfade-sensor.service`
+- `benchmarks/sensor_runtime.py`
+- `tests/test_sensor_runtime.py`
+- `tests/test_detection_pipeline.py`
 
-## Acceptance boundary
+## Architecture and security boundary
 
-- Detection inbox is tenant-scoped and bounded.
-- Workflow state is separate from immutable detection/evidence records.
-- Server-side engine authorization remains authoritative; the browser never supplies tenant identity or privileged engine credentials.
-- Mutating web proxy requests require a same-origin request when an Origin header is present.
-- Evidence is displayed with provenance hashes and explicitly separated from confidence/score.
-- Investigation supports triage, investigation, evidence review, timeline, case linking, disposition and feedback history.
-- Object-level detection/case access is tenant constrained.
-- Repository validation must cover tenant isolation, invalid workflow/disposition inputs, route security, lint/typecheck/build and end-to-end navigation before this group is marked green.
+The sensor path remains aligned with the Group 11 contract:
 
-## Capability truth
+`capture → canonical SignalEvent → existing fade engine adapter → bounded durable queue → detection/transport`
 
-| Capability | Repository status | Production-validation status |
-|---|---|---|
-| Detection inbox | Implemented | Repository validation pending |
-| Investigation workspace | Implemented | Repository validation pending |
-| Evidence timeline | Implemented | Repository validation pending |
-| Entity/session explorer | Implemented as correlation-scoped investigation records | Production sensor/entity fleet validation remains external |
-| Case management | Implemented | Repository validation pending |
-| Analyst disposition | Implemented | Repository validation pending |
-| Analyst feedback | Implemented through workflow/disposition audit history | Model-training impact is not claimed |
-| Secure web/engine boundary | Implemented | Deployment identity-provider validation remains external |
-| FusionOps handoff | Existing integration boundary preserved; no contract-breaking changes | External FusionOps end-to-end validation remains deployment work |
+The streaming detection adapter reuses `core.fade_engine.detect_fade`; it does not create a parallel detector. Session windows are bounded and keyed by tenant, sensor and flow identity.
+
+Capture privilege is isolated to the platform adapter. Linux deployment uses a dedicated service account and bounds the service to `CAP_NET_RAW`; no `CAP_NET_ADMIN` or broad root execution is required by the reference service. eBPF is not enabled by default because the current ThreatFade packet path does not require kernel-side filtering; it remains an optional future acceleration adapter.
+
+Windows capture is intentionally delegated to Npcap's user/kernel capture architecture rather than a custom driver. The same canonical event contract is used above the capture layer.
+
+The local queue is bounded by bytes, event count and retention. When the control plane is unavailable, capture continues into the durable queue. Overflow is fail-closed for evidence preservation: the queue refuses new events rather than silently evicting unexpired evidence.
+
+Sensor identity is bound to a tenant at enrollment and revoked sensors cannot ingest. Rotation is represented by re-registration under the same tenant with a new fingerprint followed by explicit activation. Production deployment must bind this lifecycle to an authenticated enrollment service; the CLI bootstrap is not a substitute for enterprise PKI.
 
 ## Verification boundary
 
-Group 14 provides an investigation workflow over existing ThreatFade detections and evidence. It does not convert confidence into truth, does not establish causal attribution, and does not claim that synthetic repository workflows equal customer-scale SOC validation. The browser is intentionally prevented from choosing a tenant or supplying privileged engine credentials.
+Build 114 measures the canonical-event + durable-queue path and reports events/sec, elapsed time, queue depth and host information. It is not a NIC line-rate benchmark and does not justify a 1M+ packets/sec claim. Real packet-loss, sustained-duration and hardware-specific capture benchmarks require execution on the target host/NIC with libpcap/AF_PACKET or Npcap.
+
+Repository tests validate canonical event conversion, bounded storage, offline replay, tenant isolation, sensor lifecycle and streaming handoff to the existing fade engine. They do not constitute field validation of packet loss, sustained throughput, kernel behavior or Windows driver installation.
 
 ## Next planned group
 
-**Group 15 — Production Sensor / Edge Runtime.**
-
-Focus: production-grade live sensor ingestion, secure enrollment, edge runtime, bounded local processing and platform-specific deployment validation.
+**Group 16 — Production Detection-to-SOC Field Validation / Sensor Fleet Operations.**
