@@ -4,7 +4,7 @@
 **Current release baseline:** v0.8.0-dev  
 **Current group:** Group 16 — Environment Profiles and Adaptive Baselines  
 **Current build:** Builds 115–120  
-**Status:** GROUP 16 IN PROGRESS — implementation branch under validation
+**Status:** GROUP 16 GREEN — repository validation complete
 
 ## Completed groups
 
@@ -23,30 +23,32 @@
 - Group 13 — Resilient Offline Evidence: ✅ Builds 91–97
 - Group 14 — Analyst Investigation & Operational Workflow: 🟢 Builds 98–107
 - Group 15 — Production Sensor / Edge Runtime: 🟢 Builds 108–114
-- Group 16 — Environment Profiles and Adaptive Baselines: 🟡 Builds 115–120
+- Group 16 — Environment Profiles and Adaptive Baselines: 🟢 Builds 115–120
 
 ## Group 16 — Environment Profiles and Adaptive Baselines
 
 | Build | Deliverable | Status |
 |---|---|---|
-| 115 | Tenant-scoped profile schema | 🟡 implemented |
-| 116 | Baseline configuration | 🟡 implemented |
-| 117 | Authorized traffic profiles | 🟡 implemented |
-| 118 | Immutable profile versioning | 🟡 implemented |
-| 119 | Profile validation | 🟡 implemented |
-| 120 | Audited rollback | 🟡 implemented |
+| 115 | Tenant-scoped profile schema | 🟢 |
+| 116 | Baseline configuration | 🟢 |
+| 117 | Authorized traffic profiles | 🟢 |
+| 118 | Immutable profile versioning | 🟢 |
+| 119 | Profile validation | 🟢 |
+| 120 | Audited rollback | 🟢 |
 
-## Evidence boundary
+## Implementation evidence
 
-Environment profiles describe expected/authorized operating context. They do not turn an authorization mismatch into a maliciousness verdict. Observed telemetry remains independent evidence and detection rules must provide the security finding.
+Phase 5 provides a bounded, deterministic `EnvironmentProfile` model, persistent tenant-scoped schema with PostgreSQL RLS, immutable versions, explicit activation/rollback, SHA-256 profile digests, and a separate `ObservationContext`/`AuthorizationAssessment` layer. Authorization mismatch is contextual and never a maliciousness verdict.
+
+Lifecycle operations are audited. Profile writes require tenant equality in the reference store and database RLS protects persistent records. Conflicting active versions require explicit activation; malformed, duplicate and skipped versions are rejected.
+
+## Verification evidence
+
+Repository validation covers profile schema bounds, deterministic digests, immutable versioning, active-profile conflict handling, rollback, tenant crossover, malformed/schema versions, duplicate values and observation-vs-authorization separation. CI/security/supply-chain/database-integrity and regression gates are the acceptance boundary.
+
+The repository does not claim that an environment profile is accurate merely because it validates structurally. Operational profile accuracy and freshness remain deployment responsibilities. Stale or inaccurate profiles must not suppress raw telemetry or independently supported detections.
 
 Phase 5 explicitly does not implement EMCON, military classification, clearance levels, or policy-as-verdict logic.
-
-The group remains incomplete until CI, security, supply-chain, tenant-isolation and regression validation are green.
-
-## Previous group verification boundary
-
-Group 15 validation remained green across Python 3.11/3.12, PostgreSQL integrity/tenant isolation, Group 10, Group 11, security, supply-chain and production-container validation. Its sensor benchmark does not claim 1M+ packets/sec.
 
 ## Next planned group
 

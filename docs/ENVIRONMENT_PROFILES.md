@@ -2,24 +2,22 @@
 
 ## Purpose
 
-Environment profiles provide tenant-scoped, versioned configuration for expected operating conditions and adaptive detection baselines. They are configuration and context, not verdicts.
+Environment profiles are tenant-scoped, versioned configuration describing expected operating context and adaptive detection baselines. They are context, not verdicts.
 
 ThreatFade deliberately separates:
 
 - **Observed behavior:** telemetry actually measured by sensors and the detection data plane.
 - **Authorized behavior:** behavior an operator has declared expected or permitted through a versioned profile.
 
-A mismatch between observed and authorized behavior is a contextual signal only. It is never sufficient by itself to label behavior malicious. A detection requires independent evidence from the detection engine and its evidence model.
+A mismatch is contextual evidence only. It is never sufficient by itself to label behavior malicious. Independent detection/evidence remains required.
 
-## Profile schema v1
+## Profile schema v1.1
 
 A profile contains:
 
 - `profile_id`, `tenant_id`, `version`, `schema_version`
-- expected protocols
-- expected ports
-- baseline entropy by protocol/context
-- baseline periodicity by protocol/context
+- expected protocols and ports
+- baseline entropy and periodicity by protocol/context
 - expected destinations
 - sensitivity thresholds
 - allowed integrations
@@ -27,31 +25,37 @@ A profile contains:
 - deployment constraints
 - lifecycle status and creation provenance
 
-Profiles are immutable by version. Updates create the next monotonically increasing version.
+Versions are immutable. Updates create the next monotonically increasing version.
 
-## Lifecycle
+## Persistence and lifecycle
 
-`draft → active → retired` is the normal lifecycle. A previously validated version may be selected again through an audited rollback operation. Only one version of a profile identity can be active for a tenant at a time.
+Profiles are persisted through the `environment_profiles` schema. PostgreSQL deployments enforce tenant isolation with RLS. `environment_profile_audit` records create, activation and rollback operations with profile digest and actor.
 
-Every create, activation and rollback operation records tenant, profile identity, version and digest in the audit trail.
+Lifecycle is `draft → active → retired`. Only one version may be active for a profile identity. An explicit activation is required when replacing an active version; conflicting active writes are rejected. Rollback selects an existing validated version and is audited.
+
+## Observation assessment
+
+`ObservationContext` represents measured telemetry. `AuthorizationAssessment` compares that observation with the active profile and returns deviations such as `protocol`, `port`, `destination`, `entropy` or `periodicity`.
+
+The assessment contains no maliciousness verdict. A deviation means **evidence is required**, not that the observation is malicious.
 
 ## Security requirements
 
-- Tenant identity is server-side context; callers cannot write a profile for another tenant.
-- Cross-tenant reads and lifecycle changes fail closed.
-- Schema and field bounds are validated before persistence.
+- Tenant identity is server-side context; callers cannot write for another tenant.
+- Database RLS prevents cross-tenant persistence access.
 - Profile versions cannot be overwritten or skipped.
-- Malformed profiles are rejected.
-- Rollback targets an existing validated version only.
-- Profile digests provide deterministic integrity references.
-- No profile field is interpreted as a maliciousness verdict.
+- Structural bounds, schema version and duplicate values are validated.
+- Active-profile conflicts fail closed.
+- Rollback targets an existing version only.
+- Deterministic SHA-256 digests provide integrity references.
+- Raw observations are never suppressed because of profile mismatch.
 
-## Staleness and deployment
+## Staleness and operational accuracy
 
-Consumers should treat profiles as stale when their configured operational validity window expires or when the tenant retires/revokes the profile. Stale-profile policy belongs to the deployment consumer and must fail closed for configuration writes; it must not suppress raw observations.
+Structural validation does not prove that a profile accurately represents a real environment. Consumers must apply deployment-specific freshness/validity rules and must not allow stale configuration to suppress telemetry or independently supported detections.
 
 ## Evidence boundary
 
-The environment-profile implementation is **repository validated** when the Phase 5 CI gates pass. It does not establish that a profile accurately represents a real environment. Profile accuracy remains an operational validation responsibility.
+Repository validation establishes deterministic profile behavior, tenant isolation, lifecycle controls and hostile-condition handling. It does not establish operational accuracy of tenant-authored profiles.
 
-Environment profiles do not implement EMCON, military classification, clearance levels, or policy-as-verdict logic.
+Phase 5 does not implement EMCON, military classification, clearance levels, or policy-as-verdict logic.
