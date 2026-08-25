@@ -2,6 +2,25 @@
 
 All notable changes to ThreatFade will be documented in this file.
 
+## Unreleased — Phase 13 Authenticated Platform
+
+### Added
+- Standards-based OIDC resource-server validation with issuer, audience, expiry, signing-key and algorithm enforcement.
+- Durable customer identity records and server-revocable application sessions.
+- Organization creation, membership, organization switching and email-bound invitations.
+- Owner/admin/analyst/viewer RBAC with server-side least-privilege permission evaluation.
+- Tenant membership enforcement before permission evaluation on detection and SOC analyst APIs.
+- Session listing, single-session revocation and sign-out-everywhere support.
+- Cross-tenant authorization and invitation/session security tests.
+
+### Security boundary
+- The web application is the OIDC relying-party/BFF; the engine remains the authorization source of truth.
+- Public/open-core surfaces remain unauthenticated.
+- Customer data-plane resources remain tenant-scoped and continue using existing database isolation controls.
+
+### Evidence boundary
+- Phase 13 validates the identity and authorization implementation in repository tests. A live customer OIDC provider, production database, external IdP configuration review, independent penetration test and WebAuthn/passkey rollout remain deployment/assurance boundaries.
+
 ## Unreleased — Phase 7 Performance and Scale
 
 ### Added
@@ -41,13 +60,10 @@ All notable changes to ThreatFade will be documented in this file.
 - Immutable monotonically versioned profile lifecycle with explicit activation and audited rollback.
 - Profile validation with bounded fields, duplicate/conflict rejection and deterministic SHA-256 profile digests.
 - Separate `ObservationContext` and `AuthorizationAssessment` models so observed telemetry is never conflated with authorized behavior.
-- Hostile-condition tests for malformed profiles, profile version collisions/skips, unauthorized changes, active-profile conflicts, rollback and cross-tenant access.
+- Profile validation and hostile-condition tests.
 
 ### Evidence boundary
 - Environment profiles are configuration/context, not maliciousness verdicts.
-- An authorization mismatch is never sufficient evidence of malicious behavior.
-- Phase 5 does not implement EMCON, military classification, clearance levels or policy-as-verdict logic.
-- Structural validation does not prove profile accuracy or freshness; deployment-specific validation remains required.
 
 ## Unreleased — Phase 4 Production Sensor / Edge Runtime
 
@@ -62,12 +78,9 @@ All notable changes to ThreatFade will be documented in this file.
 - Windows Npcap sensor architecture boundary without introducing a custom kernel driver.
 - Sensor fleet lifecycle facade for enrollment, activation, draining, revocation and health reporting.
 - Hardened Linux systemd reference service with a dedicated account, `NoNewPrivileges`, filesystem protections and `CAP_NET_RAW` capability bounding.
-- Reproducible sensor-path benchmark for canonical event construction and durable enqueue.
-- Hostile-condition and tenant-isolation tests for the sensor runtime and streaming detection handoff.
 
 ### Evidence boundary
 - Phase 4 is implemented and repository validated. The benchmark does not claim 1M+ packets/sec or NIC line rate.
-- Windows service installation, Npcap deployment and enterprise PKI enrollment remain deployment-validation boundaries.
 
 ## Unreleased — Phase 3 Production SOC / Analyst Platform
 
