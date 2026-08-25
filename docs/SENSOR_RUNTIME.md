@@ -15,13 +15,13 @@ The control plane is not required for local capture. When transport is unavailab
 
 ## Linux
 
-The reference service runs as `threatfade-sensor` and uses `CAP_NET_RAW` only for packet capture. It does not grant `CAP_NET_ADMIN`, run as root, or enable eBPF by default. eBPF can be introduced later as a separate adapter if a measured workload demonstrates that kernel-side filtering is required. Linux eBPF documentation identifies `CAP_BPF` and `CAP_NET_ADMIN` requirements for classes of eBPF programs; keeping the default path on capture sockets avoids adding those privileges unnecessarily. citeturn0search3turn0search6
+The reference service runs as `threatfade-sensor` and uses `CAP_NET_RAW` only for packet capture. It does not grant `CAP_NET_ADMIN`, run as root, or enable eBPF by default. eBPF can be introduced later as a separate adapter if a measured workload demonstrates that kernel-side filtering is required. Linux eBPF documentation describes granular capabilities for eBPF operations, including `CAP_BPF` and `CAP_NET_ADMIN` for relevant program classes: https://docs.ebpf.io/linux/ . Keeping the default path on capture sockets avoids adding those privileges unnecessarily.
 
 The service unit applies `NoNewPrivileges`, filesystem protection, namespace restrictions, a dedicated writable state directory and a capability bounding set.
 
 ## Windows
 
-Windows capture uses the Npcap architecture: a kernel-level packet filter with `packet.dll` and `wpcap.dll` user-space interfaces. ThreatFade does not introduce a custom packet-capture driver. citeturn0search11
+Windows capture uses the Npcap architecture: a kernel-level packet filter with `packet.dll` and `wpcap.dll` user-space interfaces. ThreatFade does not introduce a custom packet-capture driver. Npcap architecture reference: https://npcap.com/guide/npcap-internals.html .
 
 ## Queue contract
 
@@ -46,7 +46,7 @@ The local CLI bootstrap is an explicit deployment mechanism, not an enterprise P
 Run:
 
 ```bash
-python -m benchmarks.sensor_runtime --events 10000
+python benchmarks/sensor_runtime.py --events 10000
 ```
 
 Record the output together with host CPU, RAM, NIC, OS, Python version, packet source and test duration. The benchmark measures event construction and durable enqueue; it does **not** measure NIC line rate or packet loss. A real capture benchmark must be run on the deployment hardware using the platform capture backend.
