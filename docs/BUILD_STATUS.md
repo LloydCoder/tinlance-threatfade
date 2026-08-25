@@ -2,8 +2,8 @@
 
 **Program:** Enterprise Hardening  
 **Current release baseline:** v0.9.0-dev  
-**Current phase:** Phase 8 — Advanced Detection Science  
-**Status:** PHASE 8 EXPERIMENTAL — production ML promotion not yet justified
+**Current phase:** Phase 13 — Authenticated Platform  
+**Status:** PHASE 13 IMPLEMENTED — repository validation complete; live IdP/database configuration and independent assurance remain deployment boundaries
 
 ## Completed groups
 
@@ -27,44 +27,40 @@
 
 ## Phase 7 — Performance and Scale
 
-| Build | Deliverable | Status |
-|---|---|---|
-| 130 | End-to-end profiling and hotspot inventory | 🟢 |
-| 131 | Deterministic software data-plane benchmark harness | 🟢 |
-| 132 | Sustained 10K/100K/500K validation matrix | 🟢 |
-| 133 | Capture/queue/session/detection stage instrumentation | 🟢 |
-| 134 | Measured optimization decision record | 🟢 |
-| 135 | Reproducible benchmark artifacts and reporting | 🟢 |
-| 136 | CI performance workflow and regression guardrails | 🟢 |
+Builds 130–136 are complete. The benchmark measures the existing canonical SignalEvent serialization, bounded session/detection pipeline, throughput, p50/p95/p99 latency, RSS and queue/session depth. It does not establish NIC throughput, packet-capture loss behavior or universal production capacity.
 
-Phase 7 is complete at the software data-plane evidence boundary. Synthetic benchmark results must not be represented as NIC-level throughput or universal production capacity. Performance regression validation is isolated in `.github/workflows/performance-regression.yml` so it cannot be conflated with general CI or NIC-level capacity.
+The dedicated performance workflow validates 10K, 100K and 500K target events/sec. Any future 1M+ result must be reported with host, workload, duration, loss and latency evidence.
 
 ## Phase 8 — Advanced Detection Science
 
-| Build | Deliverable | Status |
-|---|---|---|
-| 137 | ML experiment governance and provenance harness | 🟢 |
-| 138 | Statistical-baseline comparison framework | 🟢 |
-| 139 | Leakage-safe deterministic holdout evaluation | 🟢 |
-| 140 | Experimental Isolation Forest comparator | 🟢 |
-| 141 | Calibration/robustness/explainability promotion gates | 🟢 |
-| 142 | Research decision record and model rollback boundary | 🟢 |
-| 143 | CI experiment validation workflow | 🟢 |
+Builds 137–143 are complete. Experimental ML remains isolated from production inference. The production statistical/fade detector remains authoritative. Candidate promotion requires ThreatFade-specific held-out improvement plus calibration, robustness, explainability, provenance and rollback gates.
 
-### Phase 8 evidence boundary
+## Phase 12 — SOC Analyst API
 
-The production detection path remains unchanged. Experimental ML is isolated from production inference until a candidate demonstrates material held-out improvement over the statistical baseline and passes calibration, robustness, explainability, provenance and rollback gates.
+Phase 12 is implemented on the canonical engine baseline. The analyst API provides tenant-scoped inbox pagination/filtering, investigation, evidence/provenance, entities, sessions, workflow/disposition/case operations and auditability. The engine remains the authoritative backend/security boundary.
 
-The current repository contains an Isolation Forest artifact from earlier work, but its presence is not treated as evidence of production superiority. Advanced GNN, transformer, self-supervised, continual-learning and federated-learning approaches remain research candidates until the same evaluation protocol demonstrates benefit on ThreatFade-relevant data.
+## Phase 13 — Authenticated Platform
 
-### Research decision
+Phase 13 is implemented in the consolidated authenticated-platform branch and includes:
 
-The research review supports treating temporal/graph/self-supervised methods as hypotheses rather than production features. A 2024 peer-reviewed study reports benefits from self-supervised GNNs for network-flow NIDS, while a 2024 GNN survey identifies graph construction and deployment challenges. These results are informative but not transferable performance evidence for ThreatFade's fade-window objective. NIST AI 100-2 E2025 is used for the adversarial-ML lifecycle threat model, including poisoning and evasion.
+- standards-based OIDC resource-server validation with issuer, audience, expiry, signing-key and algorithm enforcement;
+- durable customer identity records and server-revocable application sessions;
+- organization creation and membership management;
+- email-bound invitations whose acceptance identity is derived from the verified OIDC email claim;
+- owner/admin/analyst/viewer RBAC with server-side permission evaluation;
+- tenant membership enforcement before authorization;
+- session listing, single-session revocation and revoke-all support;
+- cross-tenant authorization tests;
+- deterministic identity architecture validation.
+
+### Phase 13 evidence boundary
+
+Repository tests validate the identity and authorization implementation. A live customer OIDC provider, production database/IdP configuration review, external penetration test, hardware-backed key management and WebAuthn/passkey rollout remain deployment or independent-assurance boundaries.
 
 ## CI / workflow reconciliation
 
-The primary CI workflow contains deterministic repository validation and test gates only. Phase 7 performance measurements run in the dedicated `performance-regression.yml` workflow. Phase 8 experimental governance remains isolated from production inference. Historical failures from retired workflow definitions are not treated as current validation evidence.
+Primary CI contains deterministic repository validation and test gates. Phase 7 performance measurements run in the dedicated performance workflow. Phase 8 experimental governance remains isolated from production inference. Phase 13 identity validation is part of the repository security gate. Historical failures from retired workflow definitions are not current validation evidence.
 
-## Next phase
+## Remaining program work
 
-**Phase 9 — Detection-to-SOC Field Validation / Fleet Operations and Enterprise Deployment Validation.**
+The next major milestone is **Detection-to-SOC field validation / fleet operations / enterprise deployment validation**. This requires real traffic, real sensors, deployment-host performance measurements, live IdP configuration, operational integration testing and independent assurance. Repository CI success does not imply those external validations.
