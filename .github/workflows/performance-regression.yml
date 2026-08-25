@@ -1,0 +1,52 @@
+name: ThreatFade Performance Regression
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    name: benchmark-${{ matrix.target_pps }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        target_pps:
+          - 10000
+          - 100000
+          - 500000
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Install benchmark dependencies
+        run: python -m pip install --disable-pip-version-check numpy scipy
+      - name: Data-plane import check
+        run: python -c "from core.data_plane import BoundedEventQueue, SignalEvent; print('data-plane import: OK')"
+      - name: Run sustained benchmark
+        run: python benchmarks/phase7_benchmark.py --target-pps ${{ matrix.target_pps }} --duration 10 --output phase7-${{ matrix.target_pps }}.json
+      - name: Validate benchmark artifact
+        run: python -c "import json; p='phase7-${{ matrix.target_pps }}.json'; d=json.load(open(p)); assert d['target_pps'] == ${{ matrix.target_pps }}; assert d['duration_seconds'] == 10; print('benchmark artifact: OK')"
+      - name: Upload benchmark result
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: phase7-${{ matrix.target_pps }}
+          path: phase7-${{ matrix.target_pps }}.json
+          if-no-files-found: error
