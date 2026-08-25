@@ -11,7 +11,6 @@ import re
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 from sqlalchemy import DateTime, Integer, String, Text, UniqueConstraint, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
@@ -148,12 +147,7 @@ def create_organization(subject: str, name: str, slug: str | None = None) -> Org
 
 def organizations_for(subject: str) -> list[tuple[OrganizationRecord, str]]:
     with Session(ENGINE) as session:
-        rows = session.execute(
-            select(OrganizationRecord, MembershipRecord.role)
-            .join(MembershipRecord, MembershipRecord.organization_id == OrganizationRecord.id)
-            .where(MembershipRecord.subject == subject)
-            .order_by(OrganizationRecord.created_at.asc())
-        )
+        rows = session.execute(select(OrganizationRecord, MembershipRecord.role).join(MembershipRecord, MembershipRecord.organization_id == OrganizationRecord.id).where(MembershipRecord.subject == subject).order_by(OrganizationRecord.created_at.asc()))
         return list(rows)
 
 
@@ -161,12 +155,7 @@ def membership(subject: str, organization_id: str) -> MembershipRecord | None:
     if not ORG_ID_RE.fullmatch(organization_id):
         return None
     with Session(ENGINE) as session:
-        return session.scalar(
-            select(MembershipRecord).where(
-                MembershipRecord.organization_id == organization_id,
-                MembershipRecord.subject == subject,
-            )
-        )
+        return session.scalar(select(MembershipRecord).where(MembershipRecord.organization_id == organization_id, MembershipRecord.subject == subject))
 
 
 def require_permission(subject: str, organization_id: str, permission: str) -> MembershipRecord:
@@ -179,16 +168,8 @@ def require_permission(subject: str, organization_id: str, permission: str) -> M
 def list_members(subject: str, organization_id: str) -> list[dict[str, object]]:
     require_permission(subject, organization_id, "org:read")
     with Session(ENGINE) as session:
-        rows = session.execute(
-            select(MembershipRecord, UserRecord)
-            .join(UserRecord, UserRecord.subject == MembershipRecord.subject)
-            .where(MembershipRecord.organization_id == organization_id)
-            .order_by(MembershipRecord.created_at.asc())
-        )
-        return [
-            {"subject": member.subject, "email": user.email, "name": user.name, "role": member.role, "created_at": member.created_at.isoformat()}
-            for member, user in rows
-        ]
+        rows = session.execute(select(MembershipRecord, UserRecord).join(UserRecord, UserRecord.subject == MembershipRecord.subject).where(MembershipRecord.organization_id == organization_id).order_by(MembershipRecord.created_at.asc()))
+        return [{"subject": member.subject, "email": user.email, "name": user.name, "role": member.role, "created_at": member.created_at.isoformat()} for member, user in rows]
 
 
 def invite_member(subject: str, organization_id: str, email: str, role: str) -> str:
@@ -201,27 +182,10 @@ def invite_member(subject: str, organization_id: str, email: str, role: str) -> 
     token = secrets.token_urlsafe(32)
     now = _now()
     with Session(ENGINE) as session:
-        existing = session.scalar(
-            select(InvitationRecord).where(
-                InvitationRecord.organization_id == organization_id,
-                InvitationRecord.email == normalized_email,
-                InvitationRecord.accepted_at.is_(None),
-                InvitationRecord.revoked_at.is_(None),
-            )
-        )
+        existing = session.scalar(select(InvitationRecord).where(InvitationRecord.organization_id == organization_id, InvitationRecord.email == normalized_email, InvitationRecord.accepted_at.is_(None), InvitationRecord.revoked_at.is_(None)))
         if existing:
             existing.revoked_at = now
-        session.add(
-            InvitationRecord(
-                organization_id=organization_id,
-                email=normalized_email,
-                role=role,
-                token_hash=_hash(token),
-                invited_by=subject,
-                expires_at=now + timedelta(days=7),
-                created_at=now,
-            )
-        )
+        session.add(InvitationRecord(organization_id=organization_id, email=normalized_email, role=role, token_hash=_hash(token), invited_by=subject, expires_at=now + timedelta(days=7), created_at=now))
         session.commit()
     return token
 
@@ -236,9 +200,7 @@ def accept_invitation(subject: str, token: str, email: str | None) -> str:
             raise ValueError("invalid or expired invitation")
         if not email or email.strip().lower() != invitation.email:
             raise PermissionError("invitation email does not match authenticated account")
-        existing = session.scalar(
-            select(MembershipRecord).where(MembershipRecord.organization_id == invitation.organization_id, MembershipRecord.subject == subject)
-        )
+        existing = session.scalar(select(MembershipRecord).where(MembershipRecord.organization_id == invitation.organization_id, MembershipRecord.subject == subject))
         if existing:
             existing.role = invitation.role
         else:
@@ -286,17 +248,16 @@ def remove_member(actor: str, organization_id: str, target_subject: str) -> None
 
 def register_session(subject: str, active_organization_id: str | None, user_agent: str | None, source_ip: str | None, ttl_seconds: int = 28800) -> str:
     ttl_seconds = max(900, min(ttl_seconds, 43200))
-    ensure_user(subject)
+    user = ensure_user(subject)
+    if user.disabled:
+        raise PermissionError("account is disabled")
+    if active_organization_id:
+        if membership(subject, active_organization_id) is None:
+            raise PermissionError("organization access denied")
     token = secrets.token_urlsafe(32)
     now = _now()
     with Session(ENGINE) as session:
-        session.add(
-            AuthSessionRecord(
-                token_hash=_hash(token), subject=subject, active_organization_id=active_organization_id,
-                created_at=now, last_seen_at=now, expires_at=now + timedelta(seconds=ttl_seconds),
-                user_agent=(user_agent or "")[:512] or None, source_ip=(source_ip or "")[:64] or None,
-            )
-        )
+        session.add(AuthSessionRecord(token_hash=_hash(token), subject=subject, active_organization_id=active_organization_id, created_at=now, last_seen_at=now, expires_at=now + timedelta(seconds=ttl_seconds), user_agent=(user_agent or "")[:512] or None, source_ip=(source_ip or "")[:64] or None))
         session.commit()
     return token
 
@@ -309,6 +270,9 @@ def validate_session(token: str, subject: str) -> AuthSessionRecord | None:
         now = _now()
         if row is None or row.revoked_at is not None or row.expires_at <= now:
             return None
+        user = session.scalar(select(UserRecord).where(UserRecord.subject == subject))
+        if user is None or user.disabled:
+            return None
         row.last_seen_at = now
         session.commit()
         return row
@@ -317,15 +281,8 @@ def validate_session(token: str, subject: str) -> AuthSessionRecord | None:
 def list_sessions(subject: str) -> list[dict[str, object]]:
     with Session(ENGINE) as session:
         now = _now()
-        rows = session.scalars(
-            select(AuthSessionRecord)
-            .where(AuthSessionRecord.subject == subject, AuthSessionRecord.revoked_at.is_(None), AuthSessionRecord.expires_at > now)
-            .order_by(AuthSessionRecord.last_seen_at.desc())
-        )
-        return [
-            {"id": row.id, "organization_id": row.active_organization_id, "created_at": row.created_at.isoformat(), "last_seen_at": row.last_seen_at.isoformat(), "expires_at": row.expires_at.isoformat(), "user_agent": row.user_agent, "source_ip": row.source_ip}
-            for row in rows
-        ]
+        rows = session.scalars(select(AuthSessionRecord).where(AuthSessionRecord.subject == subject, AuthSessionRecord.revoked_at.is_(None), AuthSessionRecord.expires_at > now).order_by(AuthSessionRecord.last_seen_at.desc()))
+        return [{"id": row.id, "organization_id": row.active_organization_id, "created_at": row.created_at.isoformat(), "last_seen_at": row.last_seen_at.isoformat(), "expires_at": row.expires_at.isoformat(), "user_agent": row.user_agent, "source_ip": row.source_ip} for row in rows]
 
 
 def revoke_session(subject: str, token: str) -> None:
@@ -339,9 +296,6 @@ def revoke_session(subject: str, token: str) -> None:
 def revoke_all_sessions(subject: str) -> None:
     with Session(ENGINE) as session:
         now = _now()
-        session.execute(
-            select(UserRecord).where(UserRecord.subject == subject)
-        )
         user = session.scalar(select(UserRecord).where(UserRecord.subject == subject))
         if user:
             user.session_version += 1
