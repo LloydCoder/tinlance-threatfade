@@ -37,7 +37,7 @@
 | 135 | Reproducible benchmark artifacts and reporting | 🟢 |
 | 136 | CI performance workflow and regression guardrails | 🟢 |
 
-Phase 7 is complete at the software data-plane evidence boundary. Synthetic benchmark results must not be represented as NIC-level throughput or universal production capacity. The Phase 7 workflow was reconciled with the primary CI workflow so benchmark validation is isolated, deterministic and independently auditable.
+Phase 7 is complete at the software data-plane evidence boundary. Synthetic benchmark results must not be represented as NIC-level throughput or universal production capacity. Performance regression validation is isolated in `.github/workflows/performance-regression.yml` so it cannot be conflated with general CI or NIC-level capacity.
 
 ## Phase 8 — Advanced Detection Science
 
@@ -63,7 +63,7 @@ The research review supports treating temporal/graph/self-supervised methods as 
 
 ## CI / workflow reconciliation
 
-The primary CI workflow now contains the deterministic repository validation and test gates only. Phase 7 performance measurements remain in the dedicated performance workflow, preventing synthetic throughput checks from being conflated with general CI or NIC-level capacity. Phase 8 experimental governance remains in its dedicated workflow.
+The primary CI workflow contains deterministic repository validation and test gates only. Phase 7 performance measurements run in the dedicated `performance-regression.yml` workflow. Phase 8 experimental governance remains isolated from production inference. Historical failures from retired workflow definitions are not treated as current validation evidence.
 
 ## Next phase
 
