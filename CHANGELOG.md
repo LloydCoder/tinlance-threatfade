@@ -19,7 +19,7 @@ All notable changes to ThreatFade will be documented in this file.
 - Hostile-condition and tenant-isolation tests for the sensor runtime and streaming detection handoff.
 
 ### Evidence boundary
-- Phase 4 is **implemented — repository validation pending** until CI/security/supply-chain and sensor runtime tests are green.
+- Phase 4 is **implemented and repository validated**. CI, security, supply-chain, data-plane, database-integrity and benchmark validation gates are green.
 - The benchmark does **not** claim 1M+ packets/sec or NIC line rate. Real packet-loss and sustained-duration measurements require target hardware/NIC execution.
 - The Linux reference service uses only the capture privilege required by the current adapter. eBPF is intentionally not enabled by default.
 - Windows service installation and Npcap deployment remain platform deployment validation rather than a fabricated in-repository installer claim.
