@@ -129,7 +129,7 @@ def validate_session(token: str, subject: str) -> AuthSessionRecord | None:
     with Session(ENGINE) as session:
         row = session.scalar(select(AuthSessionRecord).where(AuthSessionRecord.token_hash == _hash(token), AuthSessionRecord.subject == subject)); now = _now(); user = session.scalar(select(UserRecord).where(UserRecord.subject == subject)); expires_at = _utc(row.expires_at) if row is not None else None
         if row is None or row.revoked_at is not None or expires_at is None or expires_at <= now or user is None or user.disabled: return None
-        row.last_seen_at = now; session.commit(); session.refresh(row); return row
+        row.last_seen_at = now; session.commit(); session.refresh(row); row.expires_at = _utc(row.expires_at); session.expunge(row); return row
 def list_sessions(subject: str) -> list[dict[str, object]]:
     with Session(ENGINE) as session:
         now = _now(); rows = session.scalars(select(AuthSessionRecord).where(AuthSessionRecord.subject == subject, AuthSessionRecord.revoked_at.is_(None), AuthSessionRecord.expires_at > now).order_by(AuthSessionRecord.last_seen_at.desc()))
