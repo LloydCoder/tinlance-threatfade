@@ -8,6 +8,7 @@ All notable changes to ThreatFade will be documented in this file.
 - Linux sensor runtime entry point with explicit sensor, tenant, fingerprint and interface configuration.
 - Production live-capture adapter using Scapy/libpcap on Linux and the Npcap architecture on Windows.
 - Canonical packet-to-`SignalEvent` conversion with bounded snaplen and capture metrics.
+- Streaming sensor adapter that reuses the existing `core.fade_engine.detect_fade` implementation rather than creating a parallel detector.
 - Offline-first edge runtime that continues local ingestion while the sender/control plane is unavailable.
 - SQLite WAL durable store-and-forward queue with bounded bytes, events and retention.
 - FIFO sequence ordering, event-ID idempotency and explicit acknowledgement/replay semantics.
@@ -15,7 +16,7 @@ All notable changes to ThreatFade will be documented in this file.
 - Sensor fleet lifecycle facade for enrollment, activation, draining, revocation and health reporting.
 - Hardened Linux systemd reference service with a dedicated account, `NoNewPrivileges`, filesystem protections and `CAP_NET_RAW` capability bounding.
 - Reproducible sensor-path benchmark for canonical event construction and durable enqueue.
-- Hostile-condition and tenant-isolation tests for the sensor runtime.
+- Hostile-condition and tenant-isolation tests for the sensor runtime and streaming detection handoff.
 
 ### Evidence boundary
 - Phase 4 is **implemented — repository validation pending** until CI/security/supply-chain and sensor runtime tests are green.
