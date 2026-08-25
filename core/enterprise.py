@@ -3,13 +3,10 @@
 Security boundary rules:
 - Production authentication is OIDC/JWT only.
 - JWTs are accepted only with an explicitly allowed asymmetric RSA algorithm.
-- The tenant in the authenticated token is authoritative; an X-Tenant-ID header
-  may only repeat that tenant and can never override it.
-- ``admin`` is tenant-scoped. Cross-tenant access requires an explicit
-  ``global_admin`` claim so an ordinary tenant administrator cannot become a
-  platform administrator by changing a header.
-- Development authentication is intentionally permissive but is never enabled
-  by production configuration.
+- Organization membership is authoritative for human RBAC and tenant access.
+- A tenant header is only a request for a tenant; it never grants access.
+- Development authentication is intentionally permissive but is never enabled by
+  production configuration.
 """
 from __future__ import annotations
 
@@ -28,20 +25,20 @@ from fastapi import HTTPException, Request
 
 try:
     import jwt
-except ImportError:  # pragma: no cover - dependency gate is covered by CI
+except ImportError:  # pragma: no cover
     jwt = None
 
-ROLES = {"viewer", "analyst", "admin", "tenant_admin", "api_only"}
+ROLES = {"viewer", "analyst", "admin", "tenant_admin", "api_only", "owner"}
 ALLOWED_JWT_ALGORITHMS = {"RS256", "RS384", "RS512"}
 TENANT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,254}$")
 SUBJECT_RE = re.compile(r"^.{1,255}$", re.DOTALL)
-
 ROLE_PERMISSIONS = {
     "viewer": {"detection:read", "case:read"},
     "analyst": {"detection:read", "detection:run", "case:read", "case:write", "export:write"},
     "api_only": {"detection:run", "export:write"},
     "admin": {"*"},
-    "tenant_admin": {"detection:read", "detection:run", "case:read", "case:write", "export:write"},
+    "tenant_admin": {"detection:read", "detection:run", "case:read", "case:write", "export:write", "org:read", "org:write", "member:write", "session:read", "session:write"},
+    "owner": {"*"},
 }
 
 
@@ -149,35 +146,23 @@ class OIDCValidator:
                 algorithms=[algorithm],
                 audience=self.audience,
                 issuer=self.issuer,
-                options={
-                    "require": ["exp", "iat", "sub", "iss", "aud"],
-                    "verify_signature": True,
-                    "verify_exp": True,
-                    "verify_iat": True,
-                    "verify_iss": True,
-                    "verify_aud": True,
-                },
+                options={"require": ["exp", "iat", "sub", "iss", "aud"], "verify_signature": True, "verify_exp": True, "verify_iat": True, "verify_iss": True, "verify_aud": True},
                 leeway=int(os.getenv("THREATFADE_OIDC_CLOCK_SKEW_SECONDS", "30")),
             )
         except Exception as exc:
             raise HTTPException(401, "Invalid OIDC access token") from exc
 
         subject = _validated_identifier(claims.get("sub"), field="subject", pattern=SUBJECT_RE)
-        tenant = claims.get("tenant_id") or claims.get("https://tinlance.com/tenant_id")
-        tenant = _validated_identifier(tenant, field="tenant_id", pattern=TENANT_RE)
-
-        raw_roles = claims.get("roles", [])
-        if raw_roles is None:
-            raw_roles = []
+        tenant = claims.get("tenant_id") or claims.get("https://tinlance.com/tenant_id") or ""
+        if tenant and not TENANT_RE.fullmatch(tenant):
+            raise HTTPException(403, "Token has invalid tenant_id")
+        raw_roles = claims.get("roles", []) or []
+        namespaced_roles = claims.get("https://tinlance.com/roles", []) or []
         if not isinstance(raw_roles, list) or not all(isinstance(role, str) for role in raw_roles):
             raise HTTPException(403, "Token has invalid roles claim")
-        namespaced_roles = claims.get("https://tinlance.com/roles", [])
-        if namespaced_roles is None:
-            namespaced_roles = []
         if not isinstance(namespaced_roles, list) or not all(isinstance(role, str) for role in namespaced_roles):
             raise HTTPException(403, "Token has invalid roles claim")
         roles = (set(raw_roles) | set(namespaced_roles)) & ROLES
-
         raw_scope = claims.get("scope", "")
         if not isinstance(raw_scope, str) or len(raw_scope) > 4096:
             raise HTTPException(403, "Token has invalid scope claim")
@@ -194,7 +179,15 @@ def authenticate(request: Request, api_key: Optional[str] = None) -> Principal:
         scheme, _, credentials = authorization.partition(" ")
         if scheme.lower() != "bearer" or not credentials.strip():
             raise HTTPException(401, "Bearer authentication required")
-        return OIDC.validate(credentials.strip())
+        principal = OIDC.validate(credentials.strip())
+        session_token = request.headers.get("X-ThreatFade-Session")
+        if session_token:
+            from core.identity import validate_session
+            if validate_session(session_token, principal.subject) is None:
+                raise HTTPException(401, "Authentication session is no longer valid")
+        from core.identity import ensure_user
+        ensure_user(principal.subject, principal.claims.get("email"), principal.claims.get("name") or principal.claims.get("preferred_username"))
+        return principal
 
     if os.getenv("THREATFADE_ENV", "development").lower() != "production":
         configured = os.getenv("THREATFADE_API_KEY")
@@ -219,13 +212,26 @@ def authorize(principal: Principal, permission: str):
 
 def require_tenant(principal: Principal, tenant_id: Optional[str]) -> str:
     requested = tenant_id or principal.tenant_id
+    if not requested:
+        from core.identity import organizations_for
+        orgs = organizations_for(principal.subject)
+        if len(orgs) == 1:
+            requested = orgs[0][0].id
+        else:
+            raise HTTPException(403, "Organization selection required")
     if not TENANT_RE.fullmatch(requested):
         raise HTTPException(400, "Invalid tenant identifier")
-    # A supplied tenant header/body field is a consistency assertion, never an
-    # impersonation mechanism. Only an explicitly delegated global admin can
-    # cross tenant boundaries.
-    if requested != principal.tenant_id and not principal.is_global_admin:
-        raise HTTPException(403, "Cross-tenant access denied")
+    from core.identity import membership
+    member = membership(principal.subject, requested)
+    if member is not None:
+        principal.roles.clear()
+        principal.roles.add(member.role)
+        return requested
+    # Legacy service/development identities remain compatible outside production.
+    if os.getenv("THREATFADE_ENV", "development").lower() != "production" and requested == principal.tenant_id:
+        return requested
+    if requested != principal.tenant_id or not principal.is_global_admin:
+        raise HTTPException(403, "Tenant access denied")
     return requested
 
 
@@ -236,33 +242,14 @@ class AuditLogger:
         if directory:
             os.makedirs(directory, exist_ok=True)
 
-    def record(
-        self,
-        action,
-        principal: Principal,
-        request: Optional[Request] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ):
+    def record(self, action, principal: Principal, request: Optional[Request] = None, metadata: Optional[Dict[str, Any]] = None):
         client_ip = request.client.host if request and request.client else None
-        # Never trust forwarded client IP headers at this layer; a trusted proxy
-        # may add its own normalized identity before the request reaches us.
         try:
             if client_ip:
                 ipaddress.ip_address(client_ip)
         except ValueError:
             client_ip = None
-        event = {
-            "event_id": str(uuid.uuid4()),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "action": action,
-            "subject": principal.subject,
-            "tenant_id": principal.tenant_id,
-            "roles": sorted(principal.roles),
-            "request_id": request.headers.get("X-Request-ID") if request else None,
-            "source_ip": client_ip,
-            "auth_method": principal.auth_method,
-            "metadata": metadata or {},
-        }
+        event = {"event_id": str(uuid.uuid4()), "timestamp": datetime.now(timezone.utc).isoformat(), "action": action, "subject": principal.subject, "tenant_id": principal.tenant_id, "roles": sorted(principal.roles), "request_id": request.headers.get("X-Request-ID") if request else None, "source_ip": client_ip, "auth_method": principal.auth_method, "metadata": metadata or {}}
         with open(self.path, "a", encoding="utf-8") as handle:
             handle.write(json.dumps(event, sort_keys=True) + "\n")
 
@@ -271,10 +258,4 @@ AUDIT = AuditLogger()
 
 
 def slo_targets():
-    return {
-        "api_availability": os.getenv("THREATFADE_SLO_API_AVAILABILITY", "99.9%"),
-        "p95_detection_latency": os.getenv("THREATFADE_SLO_P95_DETECTION_LATENCY", "<2s"),
-        "p99_detection_latency": os.getenv("THREATFADE_SLO_P99_DETECTION_LATENCY", "<5s"),
-        "recovery_time_objective": os.getenv("THREATFADE_SLO_RTO", "<60m"),
-        "recovery_point_objective": os.getenv("THREATFADE_SLO_RPO", "<15m"),
-    }
+    return {"api_availability": os.getenv("THREATFADE_SLO_API_AVAILABILITY", "99.9%"), "p95_detection_latency": os.getenv("THREATFADE_SLO_P95_DETECTION_LATENCY", "<2s"), "p99_detection_latency": os.getenv("THREATFADE_SLO_P99_DETECTION_LATENCY", "<5s"), "recovery_time_objective": os.getenv("THREATFADE_SLO_RTO", "<60m"), "recovery_point_objective": os.getenv("THREATFADE_SLO_RPO", "<15m")}
