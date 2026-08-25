@@ -24,8 +24,8 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-      - name: Install runtime dependencies
-        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Install benchmark dependencies
+        run: python -m pip install --disable-pip-version-check numpy scipy
       - name: Run sustained benchmark
         run: python benchmarks/phase7_benchmark.py --target-pps ${{ matrix.target_pps }} --duration 10 --output phase7-${{ matrix.target_pps }}.json
       - name: Upload benchmark result
