@@ -2,7 +2,7 @@ name: Phase 7 Performance
 
 on:
   push:
-    branches: [main]
+    branches: [main, phase-7-performance-scale]
   pull_request:
     branches: [main]
   workflow_dispatch:
