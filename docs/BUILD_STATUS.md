@@ -37,7 +37,7 @@
 | 135 | Reproducible benchmark artifacts and reporting | 🟢 |
 | 136 | CI performance workflow and regression guardrails | 🟢 |
 
-Phase 7 is complete at the software data-plane evidence boundary. Synthetic benchmark results must not be represented as NIC-level throughput or universal production capacity.
+Phase 7 is complete at the software data-plane evidence boundary. Synthetic benchmark results must not be represented as NIC-level throughput or universal production capacity. The Phase 7 workflow was reconciled with the primary CI workflow so benchmark validation is isolated, deterministic and independently auditable.
 
 ## Phase 8 — Advanced Detection Science
 
@@ -57,9 +57,13 @@ The production detection path remains unchanged. Experimental ML is isolated fro
 
 The current repository contains an Isolation Forest artifact from earlier work, but its presence is not treated as evidence of production superiority. Advanced GNN, transformer, self-supervised, continual-learning and federated-learning approaches remain research candidates until the same evaluation protocol demonstrates benefit on ThreatFade-relevant data.
 
-## Research basis
+### Research decision
 
-The Phase 8 threat model follows the current NIST adversarial-ML taxonomy, including poisoning, evasion and lifecycle risks. Research also indicates that temporal graph methods are promising for evolving network interactions, but this does not establish superiority for ThreatFade's fade-detection problem.
+The research review supports treating temporal/graph/self-supervised methods as hypotheses rather than production features. A 2024 peer-reviewed study reports benefits from self-supervised GNNs for network-flow NIDS, while a 2024 GNN survey identifies graph construction and deployment challenges. These results are informative but not transferable performance evidence for ThreatFade's fade-window objective. NIST AI 100-2 E2025 is used for the adversarial-ML lifecycle threat model, including poisoning and evasion.
+
+## CI / workflow reconciliation
+
+The primary CI workflow now contains the deterministic repository validation and test gates only. Phase 7 performance measurements remain in the dedicated performance workflow, preventing synthetic throughput checks from being conflated with general CI or NIC-level capacity. Phase 8 experimental governance remains in its dedicated workflow.
 
 ## Next phase
 
