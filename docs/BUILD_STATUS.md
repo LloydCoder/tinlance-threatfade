@@ -4,7 +4,7 @@
 **Current release baseline:** v0.8.0-dev  
 **Current group:** Group 15 — Production Sensor / Edge Runtime  
 **Current build:** Builds 108–114  
-**Status:** GROUP 15 IMPLEMENTED — repository validation pending
+**Status:** GROUP 15 GREEN — repository validation complete
 
 ## Completed groups
 
@@ -22,19 +22,19 @@
 - Group 12 — Multi-Domain Fade Correlation: ✅ Builds 83–90
 - Group 13 — Resilient Offline Evidence: ✅ Builds 91–97
 - Group 14 — Analyst Investigation & Operational Workflow: 🟢 Builds 98–107
-- Group 15 — Production Sensor / Edge Runtime: 🟡 Builds 108–114 — validation pending
+- Group 15 — Production Sensor / Edge Runtime: 🟢 Builds 108–114
 
 ## Group 15 — Production Sensor / Edge Runtime
 
 | Build | Deliverable | Status |
 |---|---|---|
-| 108 | Linux sensor runtime | 🟢 implementation |
-| 109 | Production live-capture adapter | 🟢 implementation |
-| 110 | Windows/Npcap sensor architecture | 🟢 implementation boundary |
-| 111 | Offline-first edge runtime | 🟢 implementation |
-| 112 | Durable store-and-forward integration | 🟢 implementation |
-| 113 | Sensor fleet lifecycle facade | 🟢 implementation |
-| 114 | Reproducible sensor-path benchmark | 🟢 implementation; measured run pending |
+| 108 | Linux sensor runtime | 🟢 |
+| 109 | Production live-capture adapter | 🟢 |
+| 110 | Windows/Npcap sensor architecture | 🟢 architecture boundary |
+| 111 | Offline-first edge runtime | 🟢 |
+| 112 | Durable store-and-forward integration | 🟢 |
+| 113 | Sensor fleet lifecycle facade | 🟢 |
+| 114 | Reproducible sensor-path benchmark | 🟢 repository benchmark |
 
 ## Group 15 implementation evidence
 
@@ -66,11 +66,11 @@ The local queue is bounded by bytes, event count and retention. When the control
 
 Sensor identity is bound to a tenant at enrollment and revoked sensors cannot ingest. Rotation is represented by re-registration under the same tenant with a new fingerprint followed by explicit activation. Production deployment must bind this lifecycle to an authenticated enrollment service; the CLI bootstrap is not a substitute for enterprise PKI.
 
-## Verification boundary
+## Verification evidence
 
-Build 114 measures the canonical-event + durable-queue path and reports events/sec, elapsed time, queue depth and host information. It is not a NIC line-rate benchmark and does not justify a 1M+ packets/sec claim. Real packet-loss, sustained-duration and hardware-specific capture benchmarks require execution on the target host/NIC with libpcap/AF_PACKET or Npcap.
+The Phase 4 repository validation gates are green across Python 3.11/3.12 test jobs, PostgreSQL integrity/tenant isolation, Group 10, Group 11, security, supply-chain and production-container validation. The repository benchmark measures canonical-event construction plus durable enqueue and records host metadata; it is not a NIC line-rate benchmark and does not justify a 1M+ packets/sec claim.
 
-Repository tests validate canonical event conversion, bounded storage, offline replay, tenant isolation, sensor lifecycle and streaming handoff to the existing fade engine. They do not constitute field validation of packet loss, sustained throughput, kernel behavior or Windows driver installation.
+Real packet-loss, sustained-duration and hardware-specific capture benchmarks require execution on the target host/NIC with libpcap/AF_PACKET or Npcap. Windows driver installation and enterprise PKI enrollment remain deployment validation boundaries, not unsubstantiated production claims.
 
 ## Next planned group
 
