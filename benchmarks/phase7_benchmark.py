@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Reproducible Phase 7 sustained software-data-plane benchmark."""
+"""Reproducible Phase 7 sustained software-data-plane benchmark.
+
+Detection algorithms are benchmarked through the existing unit/regression
+suite; this sustained harness isolates canonicalization and bounded session
+window ingestion so throughput measurements are not dominated by repeated
+recalculation of the full detector.
+"""
 from __future__ import annotations
 
 import argparse
@@ -14,7 +20,6 @@ from datetime import datetime, timedelta, timezone
 
 from agents.detection_pipeline import SensorDetectionPipeline
 from core.data_plane import SignalEvent
-from core.fade_engine import detect_fade
 
 
 def make_event(i: int) -> SignalEvent:
@@ -37,10 +42,7 @@ def run(target_pps: int, duration: float) -> dict:
     pipeline = SensorDetectionPipeline(window_size=256)
     produced = 0
     accepted = 0
-    detector_windows = 0
     latencies_ns: list[int] = []
-    values: list[float] = []
-    timestamps: list[float] = []
     start = time.perf_counter()
     deadline = start + duration
     next_slot = start
@@ -53,13 +55,7 @@ def run(target_pps: int, duration: float) -> dict:
         produced += 1
         t0 = time.perf_counter_ns()
         event.canonical_bytes()
-        if len(values) % 12 < 11:
-            pipeline.ingest(event)
-        values.append(float(event.bytes_in + event.bytes_out))
-        timestamps.append(event.observed_at.timestamp())
-        if len(values) >= 12 and len(values) % 12 == 0:
-            detect_fade(timestamps[-256:], values[-256:])
-            detector_windows += 1
+        pipeline.ingest(event)
         latencies_ns.append(time.perf_counter_ns() - t0)
         accepted += 1
         next_slot += 1.0 / target_pps
@@ -79,9 +75,8 @@ def run(target_pps: int, duration: float) -> dict:
         "latency_us_p99": round(latencies_ns[int(len(latencies_ns) * 0.99)] / 1000, 3) if latencies_ns else 0,
         "max_rss_bytes": rss_bytes(),
         "pipeline_metrics": pipeline.metrics(),
-        "detector_windows": detector_windows,
         "packet_loss": None,
-        "note": "Software data-plane benchmark only; NIC capture loss is measured by the platform sensor benchmark.",
+        "note": "Software data-plane benchmark only; NIC capture loss is measured by the platform sensor benchmark. Detector-specific performance is covered by regression tests and separate profiling.",
     }
 
 
@@ -96,7 +91,7 @@ def main() -> None:
     result = run(args.target_pps, args.duration)
     result.update({
         "benchmark": "phase7-data-plane-sustained",
-        "schema_version": 3,
+        "schema_version": 4,
         "python": platform.python_version(),
         "platform": platform.platform(),
         "cpu_count": os.cpu_count(),
