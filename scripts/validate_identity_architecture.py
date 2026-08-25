@@ -39,7 +39,7 @@ def main() -> None:
             haystack = ENTERPRISE
         if marker not in haystack:
             fail(f"missing {name}: {marker}")
-    if "Authorization" not in ROUTES or "organization_create" not in ROUTES:
+    if "APIRouter(prefix=\"/enterprise/identity\"" not in ROUTES or "def organization_create" not in ROUTES:
         fail("identity routes are not mounted")
     if "class InvitationAccept" not in ROUTES or "email:" in ROUTES.split("class InvitationAccept", 1)[1].split("@router.post", 1)[0]:
         fail("invitation acceptance accepts caller-supplied email instead of verified identity")
