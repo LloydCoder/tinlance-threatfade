@@ -1,10 +1,10 @@
 # ThreatFade Enterprise Build Status
 
 **Program:** Enterprise Hardening  
-**Current release baseline:** v0.8.0-dev  
-**Current group:** Group 16 — Environment Profiles and Adaptive Baselines  
-**Current build:** Builds 115–120  
-**Status:** GROUP 16 GREEN — repository validation complete
+**Current release baseline:** v0.9.0-dev  
+**Current group:** Group 17 — Enterprise Security Integrations  
+**Current build:** Builds 121–129  
+**Status:** GROUP 17 IMPLEMENTED — repository validation pending
 
 ## Completed groups
 
@@ -24,32 +24,36 @@
 - Group 14 — Analyst Investigation & Operational Workflow: 🟢 Builds 98–107
 - Group 15 — Production Sensor / Edge Runtime: 🟢 Builds 108–114
 - Group 16 — Environment Profiles and Adaptive Baselines: 🟢 Builds 115–120
+- Group 17 — Enterprise Security Integrations: 🟡 Builds 121–129
 
-## Group 16 — Environment Profiles and Adaptive Baselines
+## Group 17 — Enterprise Security Integrations
 
 | Build | Deliverable | Status |
 |---|---|---|
-| 115 | Tenant-scoped profile schema | 🟢 |
-| 116 | Baseline configuration | 🟢 |
-| 117 | Authorized traffic profiles | 🟢 |
-| 118 | Immutable profile versioning | 🟢 |
-| 119 | Profile validation | 🟢 |
-| 120 | Audited rollback | 🟢 |
+| 121 | Canonical integration event model | 🟢 |
+| 122 | Shared authenticated delivery transport | 🟢 |
+| 123 | Retry/backoff/idempotency and dead-letter handling | 🟢 |
+| 124 | Elastic + Microsoft Sentinel adapters | 🟢 |
+| 125 | IBM QRadar + Graylog adapters | 🟢 |
+| 126 | Wazuh adapter | 🟢 |
+| 127 | MISP + OpenCTI adapters | 🟢 |
+| 128 | TheHive + vendor-neutral SOAR adapter | 🟢 |
+| 129 | Integration contract/security tests and documentation | 🟢 |
 
 ## Implementation evidence
 
-Phase 5 provides a bounded, deterministic `EnvironmentProfile` model, persistent tenant-scoped schema with PostgreSQL RLS, immutable versions, explicit activation/rollback, SHA-256 profile digests, and a separate `ObservationContext`/`AuthorizationAssessment` layer. Authorization mismatch is contextual and never a maliciousness verdict.
+`core/integrations.py` defines one canonical `IntegrationEvent`, one bounded HTTP delivery engine and thin destination adapters. The transport owns TLS policy, timeouts, authentication, deterministic tenant/event idempotency, retry/backoff, duplicate handling, dead-letter routing and delivery audit records. Credential providers are the rotation boundary and secrets are not included in delivery results or audit records.
 
-Lifecycle operations are audited. Profile writes require tenant equality in the reference store and database RLS protects persistent records. Conflicting active versions require explicit activation; malformed, duplicate and skipped versions are rejected.
+The adapters cover Elastic ECS-oriented JSON, Microsoft Sentinel Logs-Ingestion-shaped records, QRadar CEF, Graylog GELF-shaped JSON, Wazuh alert-shaped JSON, MISP event payloads, OpenCTI GraphQL envelopes, TheHive case-compatible payloads and a vendor-neutral SOAR webhook envelope.
 
-## Verification evidence
+## Evidence boundary
 
-Repository validation covers profile schema bounds, deterministic digests, immutable versioning, active-profile conflict handling, rollback, tenant crossover, malformed/schema versions, duplicate values and observation-vs-authorization separation. CI/security/supply-chain/database-integrity and regression gates are the acceptance boundary.
+Repository tests validate the shared contract and failure behavior. They do not prove live production connectivity to every third-party platform. Destination versions, receiver routes, tenant configuration, credentials and vendor-specific schemas must be validated in the target deployment.
 
-The repository does not claim that an environment profile is accurate merely because it validates structurally. Operational profile accuracy and freshness remain deployment responsibilities. Stale or inaccurate profiles must not suppress raw telemetry or independently supported detections.
+Microsoft Sentinel should use supported Logs Ingestion/data-connector mechanisms; the deprecated HTTP Data Collector API is not a dependency of this implementation. OpenCTI GraphQL mutation/schema compatibility is explicitly deployment-validated rather than claimed as a universal built-in schema.
 
-Phase 5 explicitly does not implement EMCON, military classification, clearance levels, or policy-as-verdict logic.
+FusionOps remains an external integration boundary and is not replaced by Group 17.
 
 ## Next planned group
 
-**Group 17 — Production Detection-to-SOC Field Validation / Sensor Fleet Operations.**
+**Group 18 — Detection-to-SOC Field Validation / Fleet Operations and Enterprise Deployment Validation.**
