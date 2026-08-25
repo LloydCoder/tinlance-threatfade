@@ -1,6 +1,7 @@
 from __future__ import annotations
 from datetime import datetime, timezone
 import pytest
+from core.enterprise import Principal, require_tenant
 from core.identity import create_organization, ensure_user, invite_member, membership, accept_invitation, register_session, validate_session, revoke_session, change_member_role, list_members
 
 def test_owner_admin_analyst_viewer_rbac_and_cross_tenant_isolation():
@@ -15,6 +16,18 @@ def test_owner_admin_analyst_viewer_rbac_and_cross_tenant_isolation():
     assert membership(analyst.subject, org_b.id) is None
     with pytest.raises(PermissionError): change_member_role(analyst.subject, org_b.id, other.subject, "viewer")
     assert {member["role"] for member in list_members(owner.subject, org_a.id)} == {"owner", "analyst"}
+
+def test_resource_tenant_authorization_denies_guessed_cross_tenant_id():
+    user = ensure_user("resource-boundary-phase13", "resource@example.test")
+    owner = ensure_user("resource-owner-phase13", "resource-owner@example.test")
+    other = ensure_user("resource-other-phase13", "resource-other@example.test")
+    org_a = create_organization(owner.subject, "Resource Alpha", "resource-alpha-phase13")
+    org_b = create_organization(other.subject, "Resource Beta", "resource-beta-phase13")
+    invitation = invite_member(owner.subject, org_a.id, user.email, "viewer")
+    assert accept_invitation(user.subject, invitation, user.email) == org_a.id
+    principal = Principal(user.subject, org_a.id, {"viewer"})
+    assert require_tenant(principal, org_a.id) == org_a.id
+    with pytest.raises(Exception): require_tenant(principal, org_b.id)
 
 def test_admin_cannot_grant_or_invite_admin():
     owner = ensure_user("owner-admin-phase13", "owner-admin@example.test")
