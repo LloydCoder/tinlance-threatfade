@@ -8,6 +8,8 @@ on:
       - 'datasets/**'
       - 'docs/PHASE_8*'
       - '.github/workflows/phase8-ml-experiments.yml'
+      - '.github/workflows/supply-chain.yml'
+      - 'Dockerfile'
   push:
     branches: [main]
     paths:
@@ -16,6 +18,8 @@ on:
       - 'datasets/**'
       - 'docs/PHASE_8*'
       - '.github/workflows/phase8-ml-experiments.yml'
+      - '.github/workflows/supply-chain.yml'
+      - 'Dockerfile'
 
 permissions:
   contents: read
@@ -39,8 +43,13 @@ jobs:
           from core.ml_experiments import DatasetManifest, evaluate_baseline, promotion_gate
           import numpy as np
           rng = np.random.default_rng(42)
-          X = rng.normal(size=(40, 8))
-          y = np.array([0] * 20 + [1] * 20)
+          benign_a = rng.normal(size=(15, 8))
+          attack_a = rng.normal(3.0, 1.0, size=(5, 8))
+          benign_b = rng.normal(size=(10, 8))
+          attack_b = rng.normal(3.0, 1.0, size=(5, 8))
+          benign_c = rng.normal(size=(5, 8))
+          X = np.vstack([benign_a, attack_a, benign_b, attack_b, benign_c])
+          y = np.array([0] * 15 + [1] * 5 + [0] * 10 + [1] * 5 + [0] * 5)
           manifest = DatasetManifest('ci-governance-fixture', '1', 'deterministic CI fixture')
           baseline = evaluate_baseline(X, y, manifest)
           gated = promotion_gate(baseline, baseline)
