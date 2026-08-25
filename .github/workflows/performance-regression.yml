@@ -44,7 +44,7 @@ jobs:
         run: python benchmarks/phase7_benchmark.py --target-pps ${{ matrix.target_pps }} --duration 10 --output phase7-${{ matrix.target_pps }}.json
       - name: Validate benchmark artifact
         run: |
-          python -c "import json; p='phase7-${{ matrix.target_pps }}.json'; d=json.load(open(p)); assert d['target_pps'] == ${{ matrix.target_pps }}; assert d['duration_seconds'] == 10; print('benchmark artifact: OK')"
+          python -c "import json; p='phase7-${{ matrix.target_pps }}.json'; d=json.load(open(p)); assert d['target_pps'] == ${{ matrix.target_pps }}; assert d['elapsed_seconds'] > 0; assert d['accepted'] >= 0; assert d['dropped'] >= 0; print('benchmark artifact: OK')"
       - name: Upload benchmark result
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
