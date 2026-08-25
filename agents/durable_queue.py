@@ -3,6 +3,10 @@
 The queue is local-only, bounded by both rows and bytes, and preserves FIFO
 sequence numbers. It is intentionally independent of the control plane so a
 sensor can continue collecting while disconnected.
+
+Usage counters are maintained transactionally in SQLite metadata rather than
+recomputing COUNT/SUM over the entire queue for every enqueue. This keeps the
+resource-bound checks O(1) while preserving the same durability semantics.
 """
 from __future__ import annotations
 
@@ -33,8 +37,36 @@ class DurableSensorQueue:
         with self._connect() as db:
             db.execute("PRAGMA journal_mode=WAL")
             db.execute("PRAGMA synchronous=FULL")
-            db.execute("CREATE TABLE IF NOT EXISTS events (seq INTEGER PRIMARY KEY AUTOINCREMENT, event_id TEXT NOT NULL UNIQUE, payload BLOB NOT NULL, created_at REAL NOT NULL)")
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS events ("
+                "seq INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "event_id TEXT NOT NULL UNIQUE, "
+                "payload BLOB NOT NULL, "
+                "created_at REAL NOT NULL)"
+            )
             db.execute("CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at)")
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS queue_meta ("
+                "id INTEGER PRIMARY KEY CHECK (id = 1), "
+                "event_count INTEGER NOT NULL CHECK (event_count >= 0), "
+                "payload_bytes INTEGER NOT NULL CHECK (payload_bytes >= 0))"
+            )
+            db.execute(
+                "INSERT OR IGNORE INTO queue_meta(id, event_count, payload_bytes) "
+                "SELECT 1, COUNT(*), COALESCE(SUM(length(payload)), 0) FROM events"
+            )
+            db.execute(
+                "CREATE TRIGGER IF NOT EXISTS trg_queue_meta_insert "
+                "AFTER INSERT ON events BEGIN "
+                "UPDATE queue_meta SET event_count=event_count+1, "
+                "payload_bytes=payload_bytes+length(NEW.payload) WHERE id=1; END"
+            )
+            db.execute(
+                "CREATE TRIGGER IF NOT EXISTS trg_queue_meta_delete "
+                "AFTER DELETE ON events BEGIN "
+                "UPDATE queue_meta SET event_count=event_count-1, "
+                "payload_bytes=payload_bytes-length(OLD.payload) WHERE id=1; END"
+            )
 
     def _connect(self):
         return sqlite3.connect(self.path, timeout=5, isolation_level="IMMEDIATE")
@@ -44,7 +76,9 @@ class DurableSensorQueue:
         return event.canonical_bytes()
 
     def _usage(self, db) -> tuple[int, int]:
-        row = db.execute("SELECT COUNT(*), COALESCE(SUM(length(payload)),0) FROM events").fetchone()
+        row = db.execute("SELECT event_count, payload_bytes FROM queue_meta WHERE id=1").fetchone()
+        if row is None:
+            raise RuntimeError("queue metadata missing")
         return int(row[0]), int(row[1])
 
     def enqueue(self, event: SignalEvent, *, priority: int = 50) -> bool:
@@ -65,7 +99,10 @@ class DurableSensorQueue:
                 count, used = self._usage(db)
             if count >= self.max_events or used + len(payload) > self.max_bytes:
                 return False
-            db.execute("INSERT INTO events(event_id,payload,created_at) VALUES(?,?,?)", (event.event_id, payload, now))
+            db.execute(
+                "INSERT INTO events(event_id,payload,created_at) VALUES(?,?,?)",
+                (event.event_id, payload, now),
+            )
             return True
 
     def _evict_expired(self, db, now: float) -> int:
