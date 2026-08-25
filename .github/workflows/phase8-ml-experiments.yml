@@ -1,0 +1,49 @@
+name: Phase 8 Detection Science Experiments
+
+on:
+  pull_request:
+    paths:
+      - 'core/ml_*.py'
+      - 'tests/test_ml_*.py'
+      - 'datasets/**'
+      - 'docs/PHASE_8*'
+      - '.github/workflows/phase8-ml-experiments.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'core/ml_*.py'
+      - 'tests/test_ml_*.py'
+      - 'datasets/**'
+      - 'docs/PHASE_8*'
+      - '.github/workflows/phase8-ml-experiments.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ml-governance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install project dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+      - name: Run governed ML experiment tests
+        run: python -m pytest -q tests/test_ml_experiments.py tests/test_ml_governance.py
+      - name: Reject production model promotion without evidence
+        run: |
+          python - <<'PY'
+          from core.ml_experiments import DatasetManifest, evaluate_baseline, promotion_gate
+          import numpy as np
+          rng = np.random.default_rng(42)
+          X = rng.normal(size=(40, 8))
+          y = np.array([0] * 20 + [1] * 20)
+          manifest = DatasetManifest('ci-governance-fixture', '1', 'deterministic CI fixture')
+          baseline = evaluate_baseline(X, y, manifest)
+          gated = promotion_gate(baseline, baseline)
+          assert not gated.production_candidate
+          print('No experimental model promoted: comparative evidence/governance requirements are enforced.')
+          PY
