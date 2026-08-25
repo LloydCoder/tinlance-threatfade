@@ -2,6 +2,20 @@
 
 All notable changes to ThreatFade will be documented in this file.
 
+## Unreleased — Phase 7 Performance and Scale
+
+### Added
+- Reproducible sustained software-data-plane benchmark covering canonical event serialization, bounded session reconstruction and the existing detection pipeline.
+- 10K, 100K and 500K target-throughput CI matrix.
+- Benchmark reporting for throughput, target-achievement ratio, p50/p95/p99 processing latency, RSS and pipeline depth.
+- Explicit benchmark methodology separating synthetic software-data-plane throughput from platform capture/NIC packet-loss measurements.
+- Performance engineering rule requiring measured hotspot evidence before Python vectorization, multiprocessing, native extensions, Rust, eBPF or GPU work.
+
+### Evidence boundary
+- Phase 7 does not claim 1M+ packets/sec.
+- Synthetic benchmark throughput is not equivalent to NIC capture throughput and cannot establish packet-loss behavior.
+- Production capacity must be benchmarked on the target sensor hardware, capture adapter, workload mix and deployment configuration.
+
 ## Unreleased — Phase 6 Enterprise Security Integrations
 
 ### Added
