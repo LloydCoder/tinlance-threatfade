@@ -1,1 +1,0 @@
-CI validation marker: Phase 13 identity timestamp normalization is validated through the normal pull-request workflow before final merge.
