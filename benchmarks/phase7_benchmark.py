@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Reproducible Phase 7 sustained software-data-plane benchmark.
-
-Detection algorithms are benchmarked through the existing unit/regression
-suite; this sustained harness isolates canonicalization and bounded session
-window ingestion so throughput measurements are not dominated by repeated
-recalculation of the full detector.
-"""
+"""Reproducible Phase 7 sustained canonical data-plane benchmark."""
 from __future__ import annotations
 
 import argparse
@@ -18,8 +12,7 @@ import statistics
 import time
 from datetime import datetime, timedelta, timezone
 
-from agents.detection_pipeline import SensorDetectionPipeline
-from core.data_plane import SignalEvent
+from core.data_plane import BoundedEventQueue, SignalEvent
 
 
 def make_event(i: int) -> SignalEvent:
@@ -39,9 +32,8 @@ def rss_bytes() -> int:
 def run(target_pps: int, duration: float) -> dict:
     gc.collect()
     gc.disable()
-    pipeline = SensorDetectionPipeline(window_size=256)
-    produced = 0
-    accepted = 0
+    queue = BoundedEventQueue(maxsize=4096)
+    produced = accepted = dropped = 0
     latencies_ns: list[int] = []
     start = time.perf_counter()
     deadline = start + duration
@@ -55,18 +47,23 @@ def run(target_pps: int, duration: float) -> dict:
         produced += 1
         t0 = time.perf_counter_ns()
         event.canonical_bytes()
-        pipeline.ingest(event)
+        if queue.put(event):
+            accepted += 1
+        else:
+            dropped += 1
         latencies_ns.append(time.perf_counter_ns() - t0)
-        accepted += 1
         next_slot += 1.0 / target_pps
         if next_slot < time.perf_counter() - 1.0:
             next_slot = time.perf_counter()
     elapsed = time.perf_counter() - start
     gc.enable()
     latencies_ns.sort()
+    metrics = queue.metrics()
     return {
         "target_pps": target_pps,
-        "events": accepted,
+        "events": produced,
+        "accepted": accepted,
+        "dropped": dropped,
         "elapsed_seconds": round(elapsed, 6),
         "throughput_events_per_second": round(accepted / elapsed, 2) if elapsed else 0,
         "target_achievement_ratio": round((accepted / elapsed) / target_pps, 4) if elapsed else 0,
@@ -74,9 +71,9 @@ def run(target_pps: int, duration: float) -> dict:
         "latency_us_p95": round(latencies_ns[int(len(latencies_ns) * 0.95)] / 1000, 3) if latencies_ns else 0,
         "latency_us_p99": round(latencies_ns[int(len(latencies_ns) * 0.99)] / 1000, 3) if latencies_ns else 0,
         "max_rss_bytes": rss_bytes(),
-        "pipeline_metrics": pipeline.metrics(),
+        "queue_metrics": metrics,
         "packet_loss": None,
-        "note": "Software data-plane benchmark only; NIC capture loss is measured by the platform sensor benchmark. Detector-specific performance is covered by regression tests and separate profiling.",
+        "note": "Canonicalization/queue benchmark only. Capture loss, detector and persistence performance require dedicated stage benchmarks on deployment hardware.",
     }
 
 
@@ -90,8 +87,8 @@ def main() -> None:
         raise SystemExit("invalid benchmark bounds")
     result = run(args.target_pps, args.duration)
     result.update({
-        "benchmark": "phase7-data-plane-sustained",
-        "schema_version": 4,
+        "benchmark": "phase7-canonical-queue-sustained",
+        "schema_version": 5,
         "python": platform.python_version(),
         "platform": platform.platform(),
         "cpu_count": os.cpu_count(),
