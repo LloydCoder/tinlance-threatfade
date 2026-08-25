@@ -15,7 +15,6 @@ from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from agents.signal_generator import generate_signals
-from core.analyst_api import router as analyst_router
 from core.api_security import enforce_rate_limit, read_limited_upload, validate_pcap_upload
 from core.enterprise import AUDIT, authenticate, authorize, require_tenant, slo_targets
 from core.explainability import build_evidence
@@ -36,8 +35,7 @@ if ENVIRONMENT == "production" and "*" in allowed_origins:
     raise RuntimeError("Wildcard CORS is forbidden in production")
 
 app = FastAPI(title="ThreatFade API", description="Evasion Interception Platform", version=CONFIG["branding"]["version"], docs_url="/docs", redoc_url="/redoc")
-app.include_router(analyst_router)
-app.add_middleware(CORSMiddleware, allow_origins=allowed_origins, allow_methods=["GET", "POST", "PATCH"], allow_headers=["Content-Type", "X-API-Key", "Authorization", "X-Request-ID", "X-Tenant-ID"])
+app.add_middleware(CORSMiddleware, allow_origins=allowed_origins, allow_methods=["GET", "POST"], allow_headers=["Content-Type", "X-API-Key", "Authorization", "X-Request-ID", "X-Tenant-ID"])
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
