@@ -10,6 +10,7 @@ import platform
 import resource
 import statistics
 import time
+import traceback
 from datetime import datetime, timedelta, timezone
 
 from core.data_plane import BoundedEventQueue, SignalEvent
@@ -85,19 +86,36 @@ def main() -> None:
     args = parser.parse_args()
     if args.target_pps < 100 or args.target_pps > 1_000_000 or args.duration <= 0 or args.duration > 600:
         raise SystemExit("invalid benchmark bounds")
-    result = run(args.target_pps, args.duration)
-    result.update({
-        "benchmark": "phase7-canonical-queue-sustained",
-        "schema_version": 5,
-        "python": platform.python_version(),
-        "platform": platform.platform(),
-        "cpu_count": os.cpu_count(),
-        "cpu": platform.processor(),
-        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-    })
-    with open(args.output, "w", encoding="utf-8") as fh:
-        json.dump(result, fh, indent=2, sort_keys=True)
-    print(json.dumps(result, indent=2, sort_keys=True))
+    try:
+        result = run(args.target_pps, args.duration)
+        result.update({
+            "benchmark": "phase7-canonical-queue-sustained",
+            "schema_version": 6,
+            "python": platform.python_version(),
+            "platform": platform.platform(),
+            "cpu_count": os.cpu_count(),
+            "cpu": platform.processor(),
+            "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        })
+        with open(args.output, "w", encoding="utf-8") as fh:
+            json.dump(result, fh, indent=2, sort_keys=True)
+        print(json.dumps(result, indent=2, sort_keys=True))
+    except Exception as exc:
+        diagnostic = {
+            "benchmark": "phase7-canonical-queue-sustained",
+            "schema_version": 6,
+            "target_pps": args.target_pps,
+            "duration": args.duration,
+            "error_type": type(exc).__name__,
+            "error": str(exc),
+            "traceback": traceback.format_exc(),
+            "python": platform.python_version(),
+            "platform": platform.platform(),
+        }
+        with open(args.output, "w", encoding="utf-8") as fh:
+            json.dump(diagnostic, fh, indent=2, sort_keys=True)
+        print(json.dumps(diagnostic, indent=2, sort_keys=True))
+        raise
 
 
 if __name__ == "__main__":
