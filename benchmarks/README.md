@@ -17,10 +17,10 @@ Phase 7 measures the existing ThreatFade software data plane before any native r
 ## Reproducibility
 
 ```bash
-python benchmarks/phase7_benchmark.py --events 100000 --duration 10 --output phase7-benchmark.json
+python benchmarks/phase7_benchmark.py --target-pps 10000 --duration 10 --output phase7-benchmark.json
 ```
 
-Record Python version, OS, CPU, event count, duration, throughput, p50/p95/p99 latency, RSS and pipeline depth. Repeat at least three times and report median plus run variance.
+Record Python version, OS, CPU, target rate, duration, achieved throughput, target-achievement ratio, p50/p95/p99 latency, RSS and pipeline depth. Repeat at least three times and report median plus run variance.
 
 ## Scale points
 
