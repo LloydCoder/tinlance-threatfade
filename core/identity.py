@@ -29,6 +29,10 @@ class AuthSessionRecord(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True); token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False); subject: Mapped[str] = mapped_column(String(255), index=True, nullable=False); active_organization_id: Mapped[str | None] = mapped_column(String(32), nullable=True); created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False); last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False); expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False); revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True); user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True); source_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
 if ENGINE.dialect.name == "sqlite": Base.metadata.create_all(ENGINE)
 def _now() -> datetime: return datetime.now(timezone.utc)
+def _utc(value: datetime | None) -> datetime | None:
+    if value is None: return None
+    if value.tzinfo is None: return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 def _hash(value: str) -> str: return hashlib.sha256(value.encode("utf-8")).hexdigest()
 def normalize_slug(value: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", value.strip().lower()).strip("-")
@@ -82,8 +86,8 @@ def invite_member(subject: str, organization_id: str, email: str, role: str) -> 
 def accept_invitation(subject: str, token: str, email: str | None) -> str:
     if not token or len(token) > 256: raise ValueError("invalid invitation")
     with Session(ENGINE) as session:
-        invitation = session.scalar(select(InvitationRecord).where(InvitationRecord.token_hash == _hash(token))); now = _now()
-        if invitation is None or invitation.accepted_at or invitation.revoked_at or invitation.expires_at <= now: raise ValueError("invalid or expired invitation")
+        invitation = session.scalar(select(InvitationRecord).where(InvitationRecord.token_hash == _hash(token))); now = _now(); expires_at = _utc(invitation.expires_at) if invitation is not None else None
+        if invitation is None or invitation.accepted_at or invitation.revoked_at or expires_at is None or expires_at <= now: raise ValueError("invalid or expired invitation")
         if not email or email.strip().lower() != invitation.email: raise PermissionError("invitation email does not match authenticated account")
         existing = session.scalar(select(MembershipRecord).where(MembershipRecord.organization_id == invitation.organization_id, MembershipRecord.subject == subject))
         if existing: existing.role = invitation.role
@@ -123,8 +127,8 @@ def register_session(subject: str, active_organization_id: str | None, user_agen
 def validate_session(token: str, subject: str) -> AuthSessionRecord | None:
     if not token or len(token) > 256: return None
     with Session(ENGINE) as session:
-        row = session.scalar(select(AuthSessionRecord).where(AuthSessionRecord.token_hash == _hash(token), AuthSessionRecord.subject == subject)); now = _now(); user = session.scalar(select(UserRecord).where(UserRecord.subject == subject))
-        if row is None or row.revoked_at is not None or row.expires_at <= now or user is None or user.disabled: return None
+        row = session.scalar(select(AuthSessionRecord).where(AuthSessionRecord.token_hash == _hash(token), AuthSessionRecord.subject == subject)); now = _now(); user = session.scalar(select(UserRecord).where(UserRecord.subject == subject)); expires_at = _utc(row.expires_at) if row is not None else None
+        if row is None or row.revoked_at is not None or expires_at is None or expires_at <= now or user is None or user.disabled: return None
         row.last_seen_at = now; session.commit(); return row
 def list_sessions(subject: str) -> list[dict[str, object]]:
     with Session(ENGINE) as session:
@@ -143,6 +147,6 @@ def revoke_all_sessions(subject: str) -> None:
 def switch_session_organization(subject: str, token: str, organization_id: str) -> None:
     require_permission(subject, organization_id, "org:read")
     with Session(ENGINE) as session:
-        row = session.scalar(select(AuthSessionRecord).where(AuthSessionRecord.token_hash == _hash(token), AuthSessionRecord.subject == subject))
-        if row is None or row.revoked_at is not None or row.expires_at <= _now(): raise PermissionError("invalid session")
+        row = session.scalar(select(AuthSessionRecord).where(AuthSessionRecord.token_hash == _hash(token), AuthSessionRecord.subject == subject)); expires_at = _utc(row.expires_at) if row is not None else None
+        if row is None or row.revoked_at is not None or expires_at is None or expires_at <= _now(): raise PermissionError("invalid session")
         row.active_organization_id = organization_id; row.last_seen_at = _now(); session.commit()
