@@ -8,11 +8,11 @@ Phase 7 measures the existing ThreatFade software data plane before any native r
 2. canonical `SignalEvent` construction/validation
 3. canonical serialization/digest
 4. bounded queueing
-5. session-window reconstruction
-6. entropy/statistical/ML stages where enabled
-7. evidence/persistence/API stages in their dedicated integration benchmarks
+5. session-window/detection behavior (covered by the existing pipeline regression suite and targeted profiling rather than repeated in the sustained throughput loop)
+6. entropy/statistical/ML stages (dedicated profiling required before optimization)
+7. evidence/persistence/API stages (dedicated integration benchmarks)
 
-`phase7_benchmark.py` isolates stages 2–5 using deterministic synthetic `SignalEvent` input. It is not a packet-capture benchmark and must not be used to claim packets/sec at the NIC.
+`phase7_benchmark.py` isolates stages 2–4 using deterministic synthetic `SignalEvent` input. It is not a packet-capture benchmark and must not be used to claim packets/sec at the NIC.
 
 ## Reproducibility
 
@@ -20,7 +20,7 @@ Phase 7 measures the existing ThreatFade software data plane before any native r
 python benchmarks/phase7_benchmark.py --target-pps 10000 --duration 10 --output phase7-benchmark.json
 ```
 
-Record Python version, OS, CPU, target rate, duration, achieved throughput, target-achievement ratio, p50/p95/p99 latency, RSS and pipeline depth. Repeat at least three times and report median plus run variance.
+Record Python version, OS, CPU, target rate, duration, achieved throughput, target-achievement ratio, p50/p95/p99 latency, RSS, queue depth and accepted/dropped events. Repeat at least three times and report median plus run variance.
 
 ## Scale points
 
