@@ -30,8 +30,7 @@ router = APIRouter(prefix="/enterprise/identity", tags=["identity"])
 
 def _principal(request: Request):
     enforce_rate_limit(request.client.host if request.client else "unknown")
-    principal = authenticate(request)
-    return principal
+    return authenticate(request)
 
 
 class OrganizationCreate(BaseModel):
@@ -58,13 +57,16 @@ class SessionSwitch(BaseModel):
 
 class InvitationAccept(BaseModel):
     token: str = Field(..., min_length=20, max_length=256)
-    email: Optional[str] = Field(default=None, max_length=320)
 
 
 @router.get("/me")
 def me(request: Request):
     principal = _principal(request)
-    user = ensure_user(principal.subject, principal.claims.get("email"), principal.claims.get("name") or principal.claims.get("preferred_username"))
+    user = ensure_user(
+        principal.subject,
+        principal.claims.get("email"),
+        principal.claims.get("name") or principal.claims.get("preferred_username"),
+    )
     return {"subject": user.subject, "email": user.email, "name": user.name, "disabled": bool(user.disabled)}
 
 
@@ -110,7 +112,11 @@ def invitation_create(organization_id: str, payload: InvitationCreate, request: 
 @router.post("/invitations/accept")
 def invitation_accept(payload: InvitationAccept, request: Request):
     principal = _principal(request)
-    email = payload.email or principal.claims.get("email")
+    # Never accept an email supplied by the caller as proof of invitation
+    # ownership. The verified OIDC email claim is the only identity binding.
+    email = principal.claims.get("email")
+    if not isinstance(email, str) or not email.strip():
+        raise HTTPException(403, "Authenticated account has no verified email claim")
     try:
         organization_id = accept_invitation(principal.subject, payload.token, email)
     except PermissionError as exc:
@@ -156,6 +162,7 @@ def invitation_revoke(organization_id: str, invitation_id: int, request: Request
         raise HTTPException(403, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(404, str(exc)) from exc
+    AUDIT.record("organization.invitation.revoked", principal, request, {"organization_id": organization_id, "invitation_id": invitation_id})
     return {"revoked": True}
 
 
@@ -163,10 +170,7 @@ def invitation_revoke(organization_id: str, invitation_id: int, request: Request
 def session_create(payload: SessionCreate, request: Request):
     principal = _principal(request)
     if payload.organization_id:
-        try:
-            require_tenant(principal, payload.organization_id)
-        except HTTPException:
-            raise
+        require_tenant(principal, payload.organization_id)
     token = register_session(
         principal.subject,
         payload.organization_id,
@@ -189,6 +193,7 @@ def session_revoke(request: Request, x_threatfade_session: Optional[str] = Heade
     if not x_threatfade_session:
         raise HTTPException(400, "Session identifier required")
     revoke_session(principal.subject, x_threatfade_session)
+    AUDIT.record("auth.session.revoked", principal, request)
     return {"revoked": True}
 
 
@@ -209,4 +214,5 @@ def session_switch(payload: SessionSwitch, request: Request, x_threatfade_sessio
         switch_session_organization(principal.subject, x_threatfade_session, payload.organization_id)
     except PermissionError as exc:
         raise HTTPException(403, str(exc)) from exc
+    AUDIT.record("auth.session.organization_switched", principal, request, {"organization_id": payload.organization_id})
     return {"organization_id": payload.organization_id}
