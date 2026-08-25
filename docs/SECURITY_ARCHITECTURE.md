@@ -1,7 +1,7 @@
 # ThreatFade Security Architecture
 
 **Status:** Group 1 / Build 15 — complete baseline  
-**Version:** 1.0  
+**Version:** 1.1  
 **Scope:** ThreatFade v0.4.x repository and reference deployment architecture  
 **Security target:** OWASP ASVS 5.0 Level 2 as the default application-security baseline, with Level 3 controls adopted where ThreatFade's security-monitoring, evidence, ingestion, or multi-tenant risk justifies them.
 
@@ -57,8 +57,6 @@ flowchart LR
     Packs --> Engine
     CI -->|signed build| Registry
     Registry --> Edge
-
-    classDef boundary fill:#fff,stroke:#333,stroke-width:2px;
 ```
 
 ### Trust boundaries
@@ -74,6 +72,7 @@ flowchart LR
 | TB-07 | Detection/model packs → runtime | rule/model artifacts | signing, approval, provenance, compatibility validation |
 | TB-08 | Source/CI → release artifact | source, dependencies, build configuration | protected branches, dependency controls, SBOM, provenance, signing |
 | TB-09 | Analyst console → API | analyst-controlled actions and display values | authorization, output encoding, CSRF/session controls where applicable |
+| TB-10 | API → browser/dashboard rendering | detection/evidence text, tenant data, analyst-controlled values | server-side authorization, contextual output encoding, safe DOM rendering, CSP/security headers |
 
 ## 4. Security principals
 
