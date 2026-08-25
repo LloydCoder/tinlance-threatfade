@@ -1,6 +1,7 @@
 from __future__ import annotations
 from datetime import datetime, timezone
 import pytest
+from fastapi import HTTPException
 from core.enterprise import Principal, require_tenant
 from core.identity import create_organization, ensure_user, invite_member, membership, accept_invitation, register_session, validate_session, revoke_session, change_member_role, list_members
 
@@ -27,7 +28,8 @@ def test_resource_tenant_authorization_denies_guessed_cross_tenant_id():
     assert accept_invitation(user.subject, invitation, user.email) == org_a.id
     principal = Principal(user.subject, org_a.id, {"viewer"})
     assert require_tenant(principal, org_a.id) == org_a.id
-    with pytest.raises(Exception): require_tenant(principal, org_b.id)
+    with pytest.raises(HTTPException) as exc: require_tenant(principal, org_b.id)
+    assert exc.value.status_code == 403
 
 def test_admin_cannot_grant_or_invite_admin():
     owner = ensure_user("owner-admin-phase13", "owner-admin@example.test")
