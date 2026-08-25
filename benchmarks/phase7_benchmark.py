@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Reproducible Phase 7 data-plane benchmark.
-
-The benchmark deliberately measures the existing canonical event and detection
-pipeline without claiming packet-capture throughput. Capture must be benchmarked
-with the platform adapter on the target host. Synthetic events isolate the
-software data-plane stages and make CI results reproducible.
-"""
+"""Reproducible Phase 7 sustained software-data-plane benchmark."""
 from __future__ import annotations
 
 import argparse
@@ -36,16 +30,21 @@ def rss_bytes() -> int:
     return value * (1024 if platform.system() != "Darwin" else 1)
 
 
-def run(target: int, duration: float) -> dict:
+def run(target_pps: int, duration: float) -> dict:
     gc.collect()
     gc.disable()
     pipeline = SensorDetectionPipeline(window_size=256)
     produced = 0
     accepted = 0
     latencies_ns: list[int] = []
-    start = time.perf_counter_ns()
-    deadline = time.perf_counter() + duration
+    start = time.perf_counter()
+    deadline = start + duration
+    next_slot = start
     while time.perf_counter() < deadline:
+        now = time.perf_counter()
+        if now < next_slot:
+            time.sleep(min(next_slot - now, 0.001))
+            continue
         event = make_event(produced)
         produced += 1
         t0 = time.perf_counter_ns()
@@ -53,36 +52,40 @@ def run(target: int, duration: float) -> dict:
         pipeline.ingest(event)
         latencies_ns.append(time.perf_counter_ns() - t0)
         accepted += 1
-        if target and accepted >= target:
-            break
-    elapsed = (time.perf_counter_ns() - start) / 1e9
+        next_slot += 1.0 / target_pps
+        if next_slot < time.perf_counter() - 1.0:
+            next_slot = time.perf_counter()
+    elapsed = time.perf_counter() - start
     gc.enable()
     latencies_ns.sort()
     return {
-        "target_events": target,
+        "target_pps": target_pps,
         "events": accepted,
         "elapsed_seconds": round(elapsed, 6),
         "throughput_events_per_second": round(accepted / elapsed, 2) if elapsed else 0,
+        "target_achievement_ratio": round((accepted / elapsed) / target_pps, 4) if elapsed else 0,
         "latency_us_p50": round(statistics.median(latencies_ns) / 1000, 3) if latencies_ns else 0,
         "latency_us_p95": round(latencies_ns[int(len(latencies_ns) * 0.95)] / 1000, 3) if latencies_ns else 0,
         "latency_us_p99": round(latencies_ns[int(len(latencies_ns) * 0.99)] / 1000, 3) if latencies_ns else 0,
         "max_rss_bytes": rss_bytes(),
         "pipeline_metrics": pipeline.metrics(),
+        "packet_loss": None,
+        "note": "Software data-plane benchmark only; NIC capture loss is measured by the platform sensor benchmark.",
     }
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--events", type=int, default=100_000)
+    parser.add_argument("--target-pps", type=int, default=10_000)
     parser.add_argument("--duration", type=float, default=10.0)
     parser.add_argument("--output", default="phase7-benchmark.json")
     args = parser.parse_args()
-    if args.events < 1 or args.events > 10_000_000 or args.duration <= 0 or args.duration > 600:
+    if args.target_pps < 100 or args.target_pps > 1_000_000 or args.duration <= 0 or args.duration > 600:
         raise SystemExit("invalid benchmark bounds")
-    result = run(args.events, args.duration)
+    result = run(args.target_pps, args.duration)
     result.update({
-        "benchmark": "phase7-data-plane",
-        "schema_version": 1,
+        "benchmark": "phase7-data-plane-sustained",
+        "schema_version": 2,
         "python": platform.python_version(),
         "platform": platform.platform(),
         "cpu_count": os.cpu_count(),
