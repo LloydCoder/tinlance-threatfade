@@ -2,9 +2,8 @@
 
 **Program:** Enterprise Hardening  
 **Current release baseline:** v0.9.0-dev  
-**Current group:** Group 17 — Enterprise Security Integrations  
-**Current build:** Builds 121–129  
-**Status:** GROUP 17 IMPLEMENTED — repository validation pending
+**Current phase:** Phase 7 — Performance and Scale  
+**Status:** PHASE 7 IMPLEMENTED — repository validation pending
 
 ## Completed groups
 
@@ -19,41 +18,37 @@
 - Group 9 — ThreatFade Detection Science 2.0: ✅ Builds 53–62
 - Group 10 — Real-World Evidence & Validation Framework: ✅ Builds 63–70
 - Group 11 — Detection Data Plane & Sensor Architecture: ✅ Builds 71–78
-- Group 12 — Multi-Domain Fade Correlation: ✅ Builds 83–90
-- Group 13 — Resilient Offline Evidence: ✅ Builds 91–97
+- Group 12 — Multi-Domain Fade Correlation: 🟢 Builds 83–90
+- Group 13 — Resilient Offline Evidence: 🟢 Builds 91–97
 - Group 14 — Analyst Investigation & Operational Workflow: 🟢 Builds 98–107
 - Group 15 — Production Sensor / Edge Runtime: 🟢 Builds 108–114
 - Group 16 — Environment Profiles and Adaptive Baselines: 🟢 Builds 115–120
-- Group 17 — Enterprise Security Integrations: 🟡 Builds 121–129
+- Group 17 — Enterprise Security Integrations: 🟢 Builds 121–129
 
-## Group 17 — Enterprise Security Integrations
+## Phase 7 — Performance and Scale
 
 | Build | Deliverable | Status |
 |---|---|---|
-| 121 | Canonical integration event model | 🟢 |
-| 122 | Shared authenticated delivery transport | 🟢 |
-| 123 | Retry/backoff/idempotency and dead-letter handling | 🟢 |
-| 124 | Elastic + Microsoft Sentinel adapters | 🟢 |
-| 125 | IBM QRadar + Graylog adapters | 🟢 |
-| 126 | Wazuh adapter | 🟢 |
-| 127 | MISP + OpenCTI adapters | 🟢 |
-| 128 | TheHive + vendor-neutral SOAR adapter | 🟢 |
-| 129 | Integration contract/security tests and documentation | 🟢 |
+| 130 | End-to-end profiling and hotspot inventory | 🟢 |
+| 131 | Deterministic software data-plane benchmark harness | 🟢 |
+| 132 | Sustained 10K/100K/500K pps validation matrix | 🟢 |
+| 133 | Capture/queue/session/detection stage instrumentation | 🟢 |
+| 134 | Measured optimization decision record | 🟢 |
+| 135 | Reproducible benchmark artifacts and reporting | 🟢 |
+| 136 | CI performance workflow and regression guardrails | 🟢 |
 
 ## Implementation evidence
 
-`core/integrations.py` defines one canonical `IntegrationEvent`, one bounded HTTP delivery engine and thin destination adapters. The transport owns TLS policy, timeouts, authentication, deterministic tenant/event idempotency, retry/backoff, duplicate handling, dead-letter routing and delivery audit records. Credential providers are the rotation boundary and secrets are not included in delivery results or audit records.
+`benchmarks/phase7_benchmark.py` measures the existing canonical `SignalEvent` serialization plus the existing bounded session/detection pipeline. It intentionally does not claim NIC packet-capture throughput. `benchmarks/README.md` defines the reproducibility protocol and requires capture adapters to be benchmarked separately on target hosts.
 
-The adapters cover Elastic ECS-oriented JSON, Microsoft Sentinel Logs-Ingestion-shaped records, QRadar CEF, Graylog GELF-shaped JSON, Wazuh alert-shaped JSON, MISP event payloads, OpenCTI GraphQL envelopes, TheHive case-compatible payloads and a vendor-neutral SOAR webhook envelope.
+The CI workflow `.github/workflows/phase7-performance.yml` runs sustained software-data-plane tests at 10K, 100K and 500K target events/sec. A 1M events/sec target is permitted only when the benchmark host can sustain it; no 1M+ claim is made by source code or documentation alone.
+
+No Rust/native/GPU rewrite is justified without measured hotspot evidence, an equivalent implementation, and a regression benchmark. Packet loss, disk/network I/O and capture-specific CPU behavior remain platform-sensor measurements rather than synthetic data-plane metrics.
 
 ## Evidence boundary
 
-Repository tests validate the shared contract and failure behavior. They do not prove live production connectivity to every third-party platform. Destination versions, receiver routes, tenant configuration, credentials and vendor-specific schemas must be validated in the target deployment.
+CI benchmark results are reproducible measurements of the GitHub Actions runner and are not a universal hardware-performance guarantee. Production capacity planning must repeat the benchmark on the exact sensor/control-plane hardware, workload mix and capture adapter used for deployment.
 
-Microsoft Sentinel should use supported Logs Ingestion/data-connector mechanisms; the deprecated HTTP Data Collector API is not a dependency of this implementation. OpenCTI GraphQL mutation/schema compatibility is explicitly deployment-validated rather than claimed as a universal built-in schema.
+## Next planned phase
 
-FusionOps remains an external integration boundary and is not replaced by Group 17.
-
-## Next planned group
-
-**Group 18 — Detection-to-SOC Field Validation / Fleet Operations and Enterprise Deployment Validation.**
+**Phase 8 — Detection-to-SOC Field Validation / Fleet Operations and Enterprise Deployment Validation.**
