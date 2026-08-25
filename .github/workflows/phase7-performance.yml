@@ -1,0 +1,33 @@
+name: Phase 7 Performance
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install runtime dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+      - name: Run deterministic data-plane benchmark
+        run: python benchmarks/phase7_data_plane_benchmark.py --rate 10000 --duration 10 > phase7-benchmark.json
+      - name: Validate benchmark output
+        run: python - <<'PY'
+import json
+x=json.load(open('phase7-benchmark.json'))
+assert x['requested_events']==100000
+assert x['dropped']==0
+assert x['drop_rate']==0
+assert x['throughput_events_per_second']>0
+print(json.dumps(x, indent=2))
+PY
+      - name: Upload benchmark report
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase7-benchmark
+          path: phase7-benchmark.json
