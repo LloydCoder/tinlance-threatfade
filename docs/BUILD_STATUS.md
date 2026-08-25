@@ -2,9 +2,9 @@
 
 **Program:** Enterprise Hardening  
 **Current release baseline:** v0.8.0-dev  
-**Current group:** Group 15 — Production Sensor / Edge Runtime  
-**Current build:** Builds 108–114  
-**Status:** GROUP 15 GREEN — repository validation complete
+**Current group:** Group 16 — Environment Profiles and Adaptive Baselines  
+**Current build:** Builds 115–120  
+**Status:** GROUP 16 IN PROGRESS — implementation branch under validation
 
 ## Completed groups
 
@@ -23,55 +23,31 @@
 - Group 13 — Resilient Offline Evidence: ✅ Builds 91–97
 - Group 14 — Analyst Investigation & Operational Workflow: 🟢 Builds 98–107
 - Group 15 — Production Sensor / Edge Runtime: 🟢 Builds 108–114
+- Group 16 — Environment Profiles and Adaptive Baselines: 🟡 Builds 115–120
 
-## Group 15 — Production Sensor / Edge Runtime
+## Group 16 — Environment Profiles and Adaptive Baselines
 
 | Build | Deliverable | Status |
 |---|---|---|
-| 108 | Linux sensor runtime | 🟢 |
-| 109 | Production live-capture adapter | 🟢 |
-| 110 | Windows/Npcap sensor architecture | 🟢 architecture boundary |
-| 111 | Offline-first edge runtime | 🟢 |
-| 112 | Durable store-and-forward integration | 🟢 |
-| 113 | Sensor fleet lifecycle facade | 🟢 |
-| 114 | Reproducible sensor-path benchmark | 🟢 repository benchmark |
+| 115 | Tenant-scoped profile schema | 🟡 implemented |
+| 116 | Baseline configuration | 🟡 implemented |
+| 117 | Authorized traffic profiles | 🟡 implemented |
+| 118 | Immutable profile versioning | 🟡 implemented |
+| 119 | Profile validation | 🟡 implemented |
+| 120 | Audited rollback | 🟡 implemented |
 
-## Group 15 implementation evidence
+## Evidence boundary
 
-- `agents/sensor_runtime.py`
-- `agents/live_capture.py`
-- `agents/detection_pipeline.py`
-- `agents/windows_sensor.py`
-- `agents/edge_runtime.py`
-- `agents/durable_queue.py`
-- `agents/fleet.py`
-- `deploy/systemd/threatfade-sensor.service`
-- `benchmarks/sensor_runtime.py`
-- `tests/test_sensor_runtime.py`
-- `tests/test_detection_pipeline.py`
+Environment profiles describe expected/authorized operating context. They do not turn an authorization mismatch into a maliciousness verdict. Observed telemetry remains independent evidence and detection rules must provide the security finding.
 
-## Architecture and security boundary
+Phase 5 explicitly does not implement EMCON, military classification, clearance levels, or policy-as-verdict logic.
 
-The sensor path remains aligned with the Group 11 contract:
+The group remains incomplete until CI, security, supply-chain, tenant-isolation and regression validation are green.
 
-`capture → canonical SignalEvent → existing fade engine adapter → bounded durable queue → detection/transport`
+## Previous group verification boundary
 
-The streaming detection adapter reuses `core.fade_engine.detect_fade`; it does not create a parallel detector. Session windows are bounded and keyed by tenant, sensor and flow identity.
-
-Capture privilege is isolated to the platform adapter. Linux deployment uses a dedicated service account and bounds the service to `CAP_NET_RAW`; no `CAP_NET_ADMIN` or broad root execution is required by the reference service. eBPF is not enabled by default because the current ThreatFade packet path does not require kernel-side filtering; it remains an optional future acceleration adapter.
-
-Windows capture is intentionally delegated to Npcap's user/kernel capture architecture rather than a custom driver. The same canonical event contract is used above the capture layer.
-
-The local queue is bounded by bytes, event count and retention. When the control plane is unavailable, capture continues into the durable queue. Overflow is fail-closed for evidence preservation: the queue refuses new events rather than silently evicting unexpired evidence.
-
-Sensor identity is bound to a tenant at enrollment and revoked sensors cannot ingest. Rotation is represented by re-registration under the same tenant with a new fingerprint followed by explicit activation. Production deployment must bind this lifecycle to an authenticated enrollment service; the CLI bootstrap is not a substitute for enterprise PKI.
-
-## Verification evidence
-
-The Phase 4 repository validation gates are green across Python 3.11/3.12 test jobs, PostgreSQL integrity/tenant isolation, Group 10, Group 11, security, supply-chain and production-container validation. The repository benchmark measures canonical-event construction plus durable enqueue and records host metadata; it is not a NIC line-rate benchmark and does not justify a 1M+ packets/sec claim.
-
-Real packet-loss, sustained-duration and hardware-specific capture benchmarks require execution on the target host/NIC with libpcap/AF_PACKET or Npcap. Windows driver installation and enterprise PKI enrollment remain deployment validation boundaries, not unsubstantiated production claims.
+Group 15 validation remained green across Python 3.11/3.12, PostgreSQL integrity/tenant isolation, Group 10, Group 11, security, supply-chain and production-container validation. Its sensor benchmark does not claim 1M+ packets/sec.
 
 ## Next planned group
 
-**Group 16 — Production Detection-to-SOC Field Validation / Sensor Fleet Operations.**
+**Group 17 — Production Detection-to-SOC Field Validation / Sensor Fleet Operations.**
