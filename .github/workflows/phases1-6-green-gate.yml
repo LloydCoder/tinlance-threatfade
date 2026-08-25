@@ -66,4 +66,4 @@ jobs:
         run: |
           python scripts/validate_phase2.py
           python scripts/validate_enterprise_integrations.py
-          python scripts/validate_environment_profile.py
+          pytest -q tests/test_environment_profile.py
