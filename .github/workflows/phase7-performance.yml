@@ -29,6 +29,7 @@ jobs:
       - name: Run sustained benchmark
         run: python benchmarks/phase7_benchmark.py --target-pps ${{ matrix.target_pps }} --duration 10 --output phase7-${{ matrix.target_pps }}.json
       - name: Upload benchmark result
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: phase7-${{ matrix.target_pps }}
