@@ -14,7 +14,8 @@ def event(i, value):
 def test_pipeline_is_bounded_and_uses_existing_detector():
     p = SensorDetectionPipeline(window_size=12)
     for i in range(12):
-        p.ingest(event(i, 100))
+        result = p.ingest(event(i, 100))
+    assert result is not None
     assert p.metrics()["active_sessions"] == 1
     assert p.metrics()["buffered_events"] == 12
     p.ingest(event(12, 100))
