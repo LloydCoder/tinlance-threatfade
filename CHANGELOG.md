@@ -2,6 +2,22 @@
 
 All notable changes to ThreatFade will be documented in this file.
 
+## Unreleased — Phase 5 Environment Profiles and Adaptive Baselines
+
+### Added
+- Tenant-scoped `EnvironmentProfile` schema with expected protocols, ports, destinations, entropy and periodicity baselines, sensitivity thresholds, integrations, retention and deployment constraints.
+- Immutable monotonically versioned profile lifecycle.
+- Profile validation with bounded fields and deterministic SHA-256 profile digests.
+- Audited activation and rollback with tenant enforcement.
+- Explicit separation between observed telemetry and authorized/expected operating context.
+- Hostile-condition tests for malformed profiles, profile version collisions/skips, unauthorized changes, rollback and cross-tenant access.
+
+### Evidence boundary
+- Environment profiles are configuration/context, not maliciousness verdicts.
+- An authorization mismatch is never sufficient evidence of malicious behavior.
+- Phase 5 does not implement EMCON, military classification, clearance levels or policy-as-verdict logic.
+- Profile accuracy and operational staleness remain deployment responsibilities and require environment-specific validation.
+
 ## Unreleased — Phase 4 Production Sensor / Edge Runtime
 
 ### Added
