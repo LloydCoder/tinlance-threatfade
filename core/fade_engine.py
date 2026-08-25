@@ -7,6 +7,7 @@ without treating any anomaly score as a calibrated probability.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Dict, List, Tuple
 
 import numpy as np
@@ -125,13 +126,26 @@ def _default_config() -> dict:
     }
 
 
+def _numeric_timestamps(timestamps):
+    """Convert timezone-aware datetimes or numeric timestamps to seconds."""
+    values = []
+    for value in timestamps:
+        if isinstance(value, datetime):
+            if value.tzinfo is None:
+                raise ValueError("timestamps must be timezone-aware")
+            values.append(value.timestamp())
+        else:
+            values.append(float(value))
+    return values
+
+
 def _science_features(timestamps, values, config):
     temporal = extract_temporal_features(values, low_signal_threshold=float(config.get("low_signal_threshold", 0.5)))
     beacon = None
     try:
         if timestamps is not None and len(timestamps) >= 2:
-            beacon = extract_beacon_features(timestamps)
-    except (TypeError, ValueError):
+            beacon = extract_beacon_features(_numeric_timestamps(timestamps))
+    except (TypeError, ValueError, OverflowError):
         beacon = None
     baseline = AdaptiveBaseline(min_support=max(4, min(8, len(values) // 2)))
     edge = max(1, int(round(len(values) * 0.2)))

@@ -84,6 +84,39 @@ jobs:
       - name: Build production container
         run: docker build --pull --build-arg PYTHON_BASE_TAG="$PYTHON_BASE_TAG" --build-arg PYTHON_BASE_DIGEST="${{ steps.base.outputs.digest }}" -t threatfade:ci .
 
+  phase7-performance:
+    name: phase7-performance-${{ matrix.target_pps }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        target_pps: [10000, 100000, 500000]
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Install benchmark dependencies
+        run: python -m pip install --disable-pip-version-check numpy scipy
+      - name: Import smoke test
+        run: python -c "from core.data_plane import BoundedEventQueue, SignalEvent; print('data-plane import: OK')"
+      - name: Run sustained benchmark
+        run: python benchmarks/phase7_benchmark.py --target-pps ${{ matrix.target_pps }} --duration 10 --output phase7-${{ matrix.target_pps }}.json
+      - name: Upload benchmark result
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase7-${{ matrix.target_pps }}
+          path: phase7-${{ matrix.target_pps }}.json
+          if-no-files-found: error
+
   postgres-integrity:
     runs-on: ubuntu-latest
     timeout-minutes: 25
