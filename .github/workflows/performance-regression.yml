@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   benchmark:
-    name: benchmark-${{ matrix.target_pps }}
+    name: performance-benchmark
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
