@@ -88,4 +88,6 @@ jobs:
         run: |
           python scripts/validate_phase2.py
           python scripts/validate_enterprise_integrations.py
+          python scripts/validate_security_architecture.py
           pytest -q tests/test_environment_profile.py
+      # Keep the final gate explicitly dependent on the checked-in security baseline.
