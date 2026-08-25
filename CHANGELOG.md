@@ -2,6 +2,23 @@
 
 All notable changes to ThreatFade will be documented in this file.
 
+## Unreleased — Phase 6 Enterprise Security Integrations
+
+### Added
+- Canonical `IntegrationEvent` model carrying tenant, detection, session, asset, evidence, provenance, severity and confidence context.
+- One shared `IntegrationTransport` for authentication, TLS validation, bounded timeout, retry/backoff, idempotency, delivery audit and dead-letter handling.
+- Thin destination adapters for Elastic, Microsoft Sentinel, IBM QRadar, Graylog, Wazuh, MISP, OpenCTI, TheHive and vendor-neutral SOAR webhooks.
+- Credential-provider boundary supporting bearer, API-key, basic, HMAC-SHA256 and client-certificate authentication without persisting secrets.
+- Deterministic tenant/event idempotency keys and duplicate acknowledgement handling.
+- Phase 6 integration contract tests covering adapter registration, payload generation, retries, failures, duplicate delivery, TLS policy, tenant propagation and credential non-disclosure.
+- `docs/ENTERPRISE_INTEGRATIONS.md` defining the normalized integration architecture and deployment validation boundaries.
+
+### Evidence boundary
+- Phase 6 proves the normalized implementation and repository-level transport behavior; it does not claim live connectivity, certification or production interoperability testing against every third-party deployment.
+- Microsoft Sentinel deployments should use the supported Logs Ingestion API/data-connector architecture rather than the deprecated HTTP Data Collector API.
+- OpenCTI GraphQL schema/version mapping, Wazuh ingestion configuration, TheHive routes and QRadar receiver configuration remain target-deployment contracts.
+- FusionOps remains an external integration boundary and is not replaced or weakened by the new adapter framework.
+
 ## Unreleased — Phase 5 Environment Profiles and Adaptive Baselines
 
 ### Added
