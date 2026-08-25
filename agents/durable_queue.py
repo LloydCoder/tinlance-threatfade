@@ -6,13 +6,11 @@ sensor can continue collecting while disconnected.
 """
 from __future__ import annotations
 
-import json
-import os
 import sqlite3
 import threading
 import time
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 
 from core.data_plane import SignalEvent
 
@@ -22,7 +20,7 @@ class DurableSensorQueue:
                  max_events: int = 100_000, retention_seconds: int = 7 * 86400):
         if max_bytes < 1 << 20 or max_bytes > 8 << 30:
             raise ValueError("max_bytes out of bounds")
-        if not 100 <= max_events <= 10_000_000:
+        if not 1 <= max_events <= 10_000_000:
             raise ValueError("max_events out of bounds")
         if not 60 <= retention_seconds <= 90 * 86400:
             raise ValueError("retention_seconds out of bounds")
@@ -52,6 +50,8 @@ class DurableSensorQueue:
     def enqueue(self, event: SignalEvent, *, priority: int = 50) -> bool:
         if not isinstance(event, SignalEvent):
             raise TypeError("event required")
+        if not isinstance(priority, int) or not 0 <= priority <= 100:
+            raise ValueError("priority must be between 0 and 100")
         payload = self._payload(event)
         now = time.time()
         with self._lock, self._connect() as db:
@@ -60,8 +60,6 @@ class DurableSensorQueue:
             count, used = self._usage(db)
             if len(payload) > self.max_bytes:
                 return False
-            # Never evict high-integrity event data implicitly. Retention cleanup
-            # is age-based and an explicit overflow refusal preserves evidence.
             if count >= self.max_events or used + len(payload) > self.max_bytes:
                 self._evict_expired(db, now)
                 count, used = self._usage(db)
