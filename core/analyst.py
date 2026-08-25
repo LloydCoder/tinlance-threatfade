@@ -119,7 +119,7 @@ def inbox_total(tenant_id: str, *, status: str | None = None, assignee: str | No
             q = q.join(DetectionWorkflowRecord, (DetectionWorkflowRecord.detection_id == DetectionRecord.id) & (DetectionWorkflowRecord.tenant_id == tenant_id))
             if status: q = q.where(DetectionWorkflowRecord.status == status)
             if assignee: q = q.where(DetectionWorkflowRecord.assignee == assignee)
-        return int(s.scalar_one())
+        return int(s.execute(q).scalar_one())
 
 
 def set_workflow(tenant_id: str, detection_id: int, actor: str, *, status: str | None = None, assignee: str | None = None, priority: int | None = None):
