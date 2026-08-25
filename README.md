@@ -2,7 +2,7 @@
 
 **Evasion Interception Platform** by Tinlance Limited.
 
-ThreatFade detects moments when adversaries intentionally reduce observable signals—including C2 quieting, gradual living-off-the-land activity reduction and GNSS interference—using entropy analysis, statistical deviation, heuristic detection, confidence scoring, optional ML anomaly detection, multi-domain temporal correlation, ATT&CK mapping, interoperable exports and operational integrations.
+ThreatFade detects moments when adversaries intentionally reduce observable signals—including C2 quieting, gradual living-off-the-land activity reduction and GNSS interference—using entropy analysis, statistical deviation, heuristic detection, confidence scoring, optional experimental ML anomaly detection, multi-domain temporal correlation, ATT&CK mapping, interoperable exports and operational integrations.
 
 **Status:** v0.9.0-dev — enterprise engineering baseline  
 **License:** Apache 2.0 (open-core)
@@ -31,7 +31,7 @@ The current UX includes:
 - Analyst disposition actions and an explicit investigation workflow.
 - Detection simulation controls for C2 quieting, LOTL gradual fade, GNSS jamming, normal-with-fade and mixed scenarios.
 - Multi-domain correlation evidence visualization with explicit temporal window and clock-tolerance context.
-- Optional ML anomaly layer.
+- Experimental ML evaluation layer isolated from production promotion.
 - API health/readiness and operational posture signals.
 - Validation posture showing repository evidence separately from external assurance.
 - Responsive desktop/tablet/mobile layouts.
@@ -144,7 +144,7 @@ Phase 2 also defines the portable **ThreatFade Evidence Package v1** for offline
 - C2, LOTL and GNSS fade scenarios.
 - Reusable temporal multi-domain correlation.
 - GNSS disruption ↔ network fade/C2 correlation detection pack.
-- Optional Isolation Forest anomaly layer.
+- **Experimental** Isolation Forest comparator; not a production replacement.
 - Structured evidence and confidence scoring.
 - Alert deduplication.
 - Live network/process monitoring components.
@@ -170,6 +170,22 @@ The repository now contains a reproducible sustained software-data-plane benchma
 Capture-adapter packet loss, NIC throughput, disk I/O and network I/O require deployment-host benchmarks because synthetic events cannot prove those properties. A 1M events/sec result, if eventually achieved, will be reported only with hardware, software version, workload, duration and loss/latency evidence.
 
 No Rust/native/GPU rewrite is introduced without a measured hotspot and an equivalent regression benchmark. See `benchmarks/README.md` and `docs/BUILD_STATUS.md`.
+
+## Phase 8 — Advanced Detection Science
+
+Phase 8 is an **experimental research track**. The production statistical/fade detector remains authoritative. Candidate ML methods are evaluated offline against a leakage-safe chronological holdout and may only be promoted when they materially outperform the existing baseline and pass calibration, robustness, explainability, provenance, reproducibility and rollback gates.
+
+The current implementation provides:
+
+- dataset manifests and deterministic provenance digests;
+- chronological train/test separation;
+- benign-only fitting for unsupervised anomaly candidates;
+- statistical-baseline comparison;
+- an experimental Isolation Forest comparator;
+- a conservative promotion gate;
+- CI validation of the experiment machinery.
+
+GNNs, temporal transformers, self-supervised learning, continual learning and federated learning are **research candidates, not shipped production detectors**. Synthetic CI fixtures validate experiment correctness, not real-world detection superiority. See `docs/PHASE_8_ADVANCED_DETECTION_SCIENCE.md`.
 
 ## Enterprise identity and tenancy
 

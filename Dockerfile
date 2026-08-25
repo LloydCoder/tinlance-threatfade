@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
-ARG PYTHON_BASE_TAG=3.13.15-slim-trixie
-ARG PYTHON_BASE_DIGEST=sha256:ffb752e139c0a19692a43af8d8523b274222dd68eebad5d583b45c2201c6e30a
+ARG PYTHON_BASE_TAG=3.14.7-slim-trixie
+ARG PYTHON_BASE_DIGEST=sha256:ce40764625a4ff50df3548277632e7f96c4e77fe75fa848aae9885476e7df5a4
 FROM python:${PYTHON_BASE_TAG}@${PYTHON_BASE_DIGEST}
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -13,17 +13,17 @@ LABEL org.opencontainers.image.source="https://github.com/LloydCoder/tinlance-th
       org.opencontainers.image.description="Open-core network threat detection oracle" \
       org.opencontainers.image.licenses="Apache-2.0"
 
-# The official Python base is already built from the current Debian security
-# repositories. Avoid a standalone apt-get update layer: Trivy DS-0017 flags
-# update-only patterns because stale package indexes can create non-reproducible
-# and vulnerable image layers. Dependency installation is handled below with
-# pip from the pinned application requirements.
+# The official Python base is built from the current Debian security
+# repositories. Do not add an update-only apt layer. Packaging components are
+# explicitly refreshed because image scanners may otherwise retain vulnerable
+# versions shipped in the upstream image metadata.
 RUN addgroup --system threatfade && adduser --system --ingroup threatfade threatfade
 WORKDIR /app
 
 COPY requirements.txt ./
-RUN python -m pip install --no-cache-dir --disable-pip-version-check --upgrade pip \
-    && python -m pip install --no-cache-dir --disable-pip-version-check -r requirements.txt
+RUN python -m pip install --no-cache-dir --disable-pip-version-check --upgrade pip setuptools==84.0.0 msgpack==1.2.1 \
+    && python -m pip install --no-cache-dir --disable-pip-version-check -r requirements.txt \
+    && python -m pip install --no-cache-dir --disable-pip-version-check --upgrade setuptools==84.0.0 msgpack==1.2.1
 COPY . .
 
 RUN mkdir -p /app/reports /app/tmp && chown -R threatfade:threatfade /app

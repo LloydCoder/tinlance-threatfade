@@ -2,6 +2,22 @@
 
 All notable changes to ThreatFade will be documented in this file.
 
+## Unreleased — Phase 8 Advanced Detection Science
+
+### Added
+- Governed offline ML experiment harness with dataset provenance, feature-schema versioning and deterministic manifest digests.
+- Chronological held-out evaluation with strict benign-only training for unsupervised anomaly candidates.
+- Statistical-baseline comparator and conservative model-promotion gate.
+- Experimental Isolation Forest comparator isolated from the production detection path.
+- CI workflow enforcing experiment correctness and preventing unsupported promotion.
+- Phase 8 research and evidence-boundary documentation.
+
+### Evidence boundary
+- Phase 8 does not replace the production statistical detector with ML.
+- Synthetic CI fixtures validate the experiment machinery, not production detection quality.
+- GNN, transformer, self-supervised, continual-learning and federated approaches remain research candidates until ThreatFade-specific held-out evidence demonstrates benefit.
+- No model is promoted without calibration, robustness, explainability, provenance, reproducibility and rollback evidence.
+
 ## Unreleased — Phase 7 Performance and Scale
 
 ### Added
