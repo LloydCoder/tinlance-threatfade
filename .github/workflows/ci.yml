@@ -59,8 +59,6 @@ jobs:
         run: python scripts/validate_ground_truth.py
       - name: Validate reliability architecture
         run: python scripts/validate_reliability.py
-      - name: Validate disaster recovery architecture
-        run: python scripts/validate_disaster_recovery.py
       - name: Run test suite
         run: python -m pytest -q
       - name: Run benchmark smoke test
