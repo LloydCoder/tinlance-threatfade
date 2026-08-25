@@ -1,0 +1,30 @@
+[Unit]
+Description=ThreatFade Sensor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=threatfade-sensor
+Group=threatfade-sensor
+ExecStart=/usr/bin/python3 -m agents.sensor_runtime
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_PACKET
+ReadWritePaths=/var/lib/threatfade
+CapabilityBoundingSet=CAP_NET_RAW
+AmbientCapabilities=CAP_NET_RAW
+
+[Install]
+WantedBy=multi-user.target
