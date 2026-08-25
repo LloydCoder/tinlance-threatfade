@@ -161,6 +161,16 @@ Detection packs use stable IDs, semantic versions, descriptions and ATT&CK mappi
 
 Core rules include `TF-C2-001`, `TF-LOTL-001`, `TF-GNSS-001` and `TF-GNSS-CORR-001`.
 
+## Phase 7 — Performance and Scale
+
+ThreatFade does **not** claim a roadmap-derived 1M+ packets/sec capability. Phase 7 first measures the actual system and only then selects the appropriate optimization technique.
+
+The repository now contains a reproducible sustained software-data-plane benchmark at `benchmarks/phase7_benchmark.py` and CI coverage for 10K, 100K and 500K target events/sec. The harness measures canonical event serialization, the existing bounded session window and detection pipeline, throughput, p50/p95/p99 processing latency, RSS and queue/session depth.
+
+Capture-adapter packet loss, NIC throughput, disk I/O and network I/O require deployment-host benchmarks because synthetic events cannot prove those properties. A 1M events/sec result, if eventually achieved, will be reported only with hardware, software version, workload, duration and loss/latency evidence.
+
+No Rust/native/GPU rewrite is introduced without a measured hotspot and an equivalent regression benchmark. See `benchmarks/README.md` and `docs/BUILD_STATUS.md`.
+
 ## Enterprise identity and tenancy
 
 - OIDC/JWT validation with issuer, audience, JWKS and time-claim validation.
