@@ -2,8 +2,8 @@
 
 **Program:** Enterprise Hardening  
 **Current release baseline:** v0.9.0-dev  
-**Current phase:** Phase 7 — Performance and Scale  
-**Status:** PHASE 7 IMPLEMENTED — repository validation pending
+**Current phase:** Phase 8 — Advanced Detection Science  
+**Status:** PHASE 8 EXPERIMENTAL — production ML promotion not yet justified
 
 ## Completed groups
 
@@ -31,24 +31,36 @@
 |---|---|---|
 | 130 | End-to-end profiling and hotspot inventory | 🟢 |
 | 131 | Deterministic software data-plane benchmark harness | 🟢 |
-| 132 | Sustained 10K/100K/500K pps validation matrix | 🟢 |
+| 132 | Sustained 10K/100K/500K validation matrix | 🟢 |
 | 133 | Capture/queue/session/detection stage instrumentation | 🟢 |
 | 134 | Measured optimization decision record | 🟢 |
 | 135 | Reproducible benchmark artifacts and reporting | 🟢 |
 | 136 | CI performance workflow and regression guardrails | 🟢 |
 
-## Implementation evidence
+Phase 7 is complete at the software data-plane evidence boundary. Synthetic benchmark results must not be represented as NIC-level throughput or universal production capacity.
 
-`benchmarks/phase7_benchmark.py` measures the existing canonical `SignalEvent` serialization plus the existing bounded session/detection pipeline. It intentionally does not claim NIC packet-capture throughput. `benchmarks/README.md` defines the reproducibility protocol and requires capture adapters to be benchmarked separately on target hosts.
+## Phase 8 — Advanced Detection Science
 
-The CI workflow `.github/workflows/phase7-performance.yml` runs sustained software-data-plane tests at 10K, 100K and 500K target events/sec. A 1M events/sec target is permitted only when the benchmark host can sustain it; no 1M+ claim is made by source code or documentation alone.
+| Build | Deliverable | Status |
+|---|---|---|
+| 137 | ML experiment governance and provenance harness | 🟢 |
+| 138 | Statistical-baseline comparison framework | 🟢 |
+| 139 | Leakage-safe deterministic holdout evaluation | 🟢 |
+| 140 | Experimental Isolation Forest comparator | 🟢 |
+| 141 | Calibration/robustness/explainability promotion gates | 🟢 |
+| 142 | Research decision record and model rollback boundary | 🟢 |
+| 143 | CI experiment validation workflow | 🟢 |
 
-No Rust/native/GPU rewrite is justified without measured hotspot evidence, an equivalent implementation, and a regression benchmark. Packet loss, disk/network I/O and capture-specific CPU behavior remain platform-sensor measurements rather than synthetic data-plane metrics.
+### Phase 8 evidence boundary
 
-## Evidence boundary
+The production detection path remains unchanged. Experimental ML is isolated from production inference until a candidate demonstrates material held-out improvement over the statistical baseline and passes calibration, robustness, explainability, provenance and rollback gates.
 
-CI benchmark results are reproducible measurements of the GitHub Actions runner and are not a universal hardware-performance guarantee. Production capacity planning must repeat the benchmark on the exact sensor/control-plane hardware, workload mix and capture adapter used for deployment.
+The current repository contains an Isolation Forest artifact from earlier work, but its presence is not treated as evidence of production superiority. Advanced GNN, transformer, self-supervised, continual-learning and federated-learning approaches remain research candidates until the same evaluation protocol demonstrates benefit on ThreatFade-relevant data.
 
-## Next planned phase
+## Research basis
 
-**Phase 8 — Detection-to-SOC Field Validation / Fleet Operations and Enterprise Deployment Validation.**
+The Phase 8 threat model follows the current NIST adversarial-ML taxonomy, including poisoning, evasion and lifecycle risks. Research also indicates that temporal graph methods are promising for evolving network interactions, but this does not establish superiority for ThreatFade's fade-detection problem.
+
+## Next phase
+
+**Phase 9 — Detection-to-SOC Field Validation / Fleet Operations and Enterprise Deployment Validation.**
