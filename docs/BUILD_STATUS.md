@@ -2,8 +2,8 @@
 
 **Program:** Enterprise Hardening  
 **Current release baseline:** v0.9.0-dev  
-**Current phase:** Phase 7 — Performance and Scale  
-**Status:** PHASE 7 IMPLEMENTED — repository validation pending
+**Current phase:** Phase 13 — Authenticated Platform  
+**Status:** PHASE 13 IMPLEMENTED — repository validation complete; live IdP/database configuration and independent assurance remain deployment boundaries
 
 ## Completed groups
 
@@ -27,28 +27,40 @@
 
 ## Phase 7 — Performance and Scale
 
-| Build | Deliverable | Status |
-|---|---|---|
-| 130 | End-to-end profiling and hotspot inventory | 🟢 |
-| 131 | Deterministic software data-plane benchmark harness | 🟢 |
-| 132 | Sustained 10K/100K/500K pps validation matrix | 🟢 |
-| 133 | Capture/queue/session/detection stage instrumentation | 🟢 |
-| 134 | Measured optimization decision record | 🟢 |
-| 135 | Reproducible benchmark artifacts and reporting | 🟢 |
-| 136 | CI performance workflow and regression guardrails | 🟢 |
+Builds 130–136 are complete. The benchmark measures the existing canonical SignalEvent serialization, bounded session/detection pipeline, throughput, p50/p95/p99 latency, RSS and queue/session depth. It does not establish NIC throughput, packet-capture loss behavior or universal production capacity.
 
-## Implementation evidence
+The dedicated performance workflow validates 10K, 100K and 500K target events/sec. Any future 1M+ result must be reported with host, workload, duration, loss and latency evidence.
 
-`benchmarks/phase7_benchmark.py` measures the existing canonical `SignalEvent` serialization plus the existing bounded session/detection pipeline. It intentionally does not claim NIC packet-capture throughput. `benchmarks/README.md` defines the reproducibility protocol and requires capture adapters to be benchmarked separately on target hosts.
+## Phase 8 — Advanced Detection Science
 
-The CI workflow `.github/workflows/phase7-performance.yml` runs sustained software-data-plane tests at 10K, 100K and 500K target events/sec. A 1M events/sec target is permitted only when the benchmark host can sustain it; no 1M+ claim is made by source code or documentation alone.
+Builds 137–143 are complete. Experimental ML remains isolated from production inference. The production statistical/fade detector remains authoritative. Candidate promotion requires ThreatFade-specific held-out improvement plus calibration, robustness, explainability, provenance and rollback gates.
 
-No Rust/native/GPU rewrite is justified without measured hotspot evidence, an equivalent implementation, and a regression benchmark. Packet loss, disk/network I/O and capture-specific CPU behavior remain platform-sensor measurements rather than synthetic data-plane metrics.
+## Phase 12 — SOC Analyst API
 
-## Evidence boundary
+Phase 12 is implemented on the canonical engine baseline. The analyst API provides tenant-scoped inbox pagination/filtering, investigation, evidence/provenance, entities, sessions, workflow/disposition/case operations and auditability. The engine remains the authoritative backend/security boundary.
 
-CI benchmark results are reproducible measurements of the GitHub Actions runner and are not a universal hardware-performance guarantee. Production capacity planning must repeat the benchmark on the exact sensor/control-plane hardware, workload mix and capture adapter used for deployment.
+## Phase 13 — Authenticated Platform
 
-## Next planned phase
+Phase 13 is implemented in the consolidated authenticated-platform branch and includes:
 
-**Phase 8 — Detection-to-SOC Field Validation / Fleet Operations and Enterprise Deployment Validation.**
+- standards-based OIDC resource-server validation with issuer, audience, expiry, signing-key and algorithm enforcement;
+- durable customer identity records and server-revocable application sessions;
+- organization creation and membership management;
+- email-bound invitations whose acceptance identity is derived from the verified OIDC email claim;
+- owner/admin/analyst/viewer RBAC with server-side permission evaluation;
+- tenant membership enforcement before authorization;
+- session listing, single-session revocation and revoke-all support;
+- cross-tenant authorization tests;
+- deterministic identity architecture validation.
+
+### Phase 13 evidence boundary
+
+Repository tests validate the identity and authorization implementation. A live customer OIDC provider, production database/IdP configuration review, external penetration test, hardware-backed key management and WebAuthn/passkey rollout remain deployment or independent-assurance boundaries.
+
+## CI / workflow reconciliation
+
+Primary CI contains deterministic repository validation and test gates. Phase 7 performance measurements run in the dedicated performance workflow. Phase 8 experimental governance remains isolated from production inference. Phase 13 identity validation is part of the repository security gate. Historical failures from retired workflow definitions are not current validation evidence.
+
+## Remaining program work
+
+The next major milestone is **Detection-to-SOC field validation / fleet operations / enterprise deployment validation**. This requires real traffic, real sensors, deployment-host performance measurements, live IdP configuration, operational integration testing and independent assurance. Repository CI success does not imply those external validations.
