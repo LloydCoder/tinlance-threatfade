@@ -1,0 +1,92 @@
+name: Phase 16.5 Validation Gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, phase16.5-production-validation-gate]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase16-5-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detection-regression:
+    name: Synthetic detection regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+
+      - name: Run evaluation unit tests
+        run: python -m pytest -q tests/test_evaluation.py tests/test_evaluation_corpus.py tests/test_evaluation_governance.py
+
+      - name: Run deterministic synthetic benchmark
+        run: python benchmarks/benchmark.py | tee phase16-5-benchmark.txt
+
+      - name: Validate benchmark artifact
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('reports/benchmarks/synthetic-scenario-v2.json')
+          if not path.is_file():
+              raise SystemExit('Missing benchmark artifact')
+          report = json.loads(path.read_text(encoding='utf-8'))
+          expected = 5 * 100
+          if report.get('corpus_size') != expected:
+              raise SystemExit(f"Unexpected corpus_size: {report.get('corpus_size')}")
+          required = {'metrics', 'ranking', 'calibration', 'latency', 'scenarios', 'confidence_intervals'}
+          missing = required - report.keys()
+          if missing:
+              raise SystemExit(f'Missing report sections: {sorted(missing)}')
+          print(json.dumps({
+              'corpus_size': report['corpus_size'],
+              'metrics': report['metrics'],
+              'latency': report['latency'],
+          }, indent=2))
+          PY
+
+      - name: Upload reproducibility artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: threatfade-phase16-5-synthetic-validation-${{ github.sha }}
+          path: |
+            reports/benchmarks/synthetic-scenario-v2.json
+            phase16-5-benchmark.txt
+          if-no-files-found: error
+
+  repository-tests:
+    name: Repository regression suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+
+      - name: Run repository tests
+        run: python -m pytest -q
