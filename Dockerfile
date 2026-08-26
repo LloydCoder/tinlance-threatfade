@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
 ARG PYTHON_BASE_TAG=3.14.7-slim-trixie
-ARG PYTHON_BASE_DIGEST=sha256:ce40764625a4ff50df3548277632e7f96c4e77fe75fa848aae9885476e7df5a4
+ARG PYTHON_BASE_DIGEST=sha256:83ff1d245a3d57d04152252d3ef9cb361494d0b3395abd65a5ebe91c401c8e83
 FROM python:${PYTHON_BASE_TAG}@${PYTHON_BASE_DIGEST}
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -16,8 +16,7 @@ LABEL org.opencontainers.image.source="https://github.com/LloydCoder/tinlance-th
 RUN addgroup --system threatfade && adduser --system --ingroup threatfade threatfade
 WORKDIR /app
 
-# Refresh Debian security packages to the currently fixed Trixie versions.
-# These versions address the OpenSSL vulnerabilities rejected by the supply-chain gate.
+# Refresh Debian security packages to currently fixed Trixie versions.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        libssl3t64=3.5.7-1~deb13u2 \
