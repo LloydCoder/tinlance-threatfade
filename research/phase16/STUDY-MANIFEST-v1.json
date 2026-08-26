@@ -1,0 +1,16 @@
+{
+  "study_id": "threatfade-bfd-repro-v1",
+  "version": "1.0.0",
+  "status": "protocol-only",
+  "question": "Can behavioral fade detection distinguish documented fade scenarios from a benign transient fade under controlled conditions?",
+  "engine_source": "https://github.com/LloydCoder/tinlance-threatfade",
+  "fixture": "datasets/fixtures/ground_truth_v1.jsonl",
+  "fixture_sha256": "c0295fb1c787bbe60d5c9ccf7b5ae61d050b1cb9",
+  "synthetic_scenarios": ["c2_quieting", "normal_with_fade"],
+  "primary_metrics": ["precision", "recall", "specificity", "f1", "false_positive_rate", "false_negative_rate"],
+  "secondary_metrics": ["pr_auc", "roc_auc", "calibration_error"],
+  "performance_metrics": ["throughput", "p50_latency_ms", "p95_latency_ms", "p99_latency_ms", "rss_mb", "queue_depth", "accepted_events", "dropped_events"],
+  "required_provenance": ["engine_commit", "dataset_digest", "runtime", "config_digest", "threshold_profile", "execution_timestamp"],
+  "publication_rule": "No result is publishable until the execution artifact is generated from a pinned engine commit and dataset digest.",
+  "limitations": ["synthetic fixture", "small sample", "no independent corpus", "no production generalization claim"]
+}
