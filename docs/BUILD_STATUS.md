@@ -2,8 +2,8 @@
 
 **Program:** Enterprise Hardening  
 **Current release baseline:** v0.9.0-dev  
-**Current phase:** Phase 13 — Authenticated Platform  
-**Status:** PHASE 13 IMPLEMENTED — repository validation complete; live IdP/database configuration and independent assurance remain deployment boundaries
+**Current phase:** Phase 16.5 — Production Readiness, Detection Validation & Design-Partner Gate  
+**Status:** PHASE 16.5 IN PROGRESS — repository validation infrastructure is being reconciled; real-world labeled-traffic validation, live deployment configuration and independent assurance remain external evidence boundaries.
 
 ## Completed groups
 
@@ -41,26 +41,22 @@ Phase 12 is implemented on the canonical engine baseline. The analyst API provid
 
 ## Phase 13 — Authenticated Platform
 
-Phase 13 is implemented in the consolidated authenticated-platform branch and includes:
+Phase 13 is implemented in the consolidated authenticated-platform branch and includes standards-based OIDC resource-server validation, durable customer identity records, server-revocable sessions, organization membership/invitations, owner/admin/analyst/viewer RBAC, tenant membership enforcement, session revocation and cross-tenant authorization tests.
 
-- standards-based OIDC resource-server validation with issuer, audience, expiry, signing-key and algorithm enforcement;
-- durable customer identity records and server-revocable application sessions;
-- organization creation and membership management;
-- email-bound invitations whose acceptance identity is derived from the verified OIDC email claim;
-- owner/admin/analyst/viewer RBAC with server-side permission evaluation;
-- tenant membership enforcement before authorization;
-- session listing, single-session revocation and revoke-all support;
-- cross-tenant authorization tests;
-- deterministic identity architecture validation.
+A live customer OIDC provider, production database/IdP configuration review, external penetration test, hardware-backed key management and WebAuthn/passkey rollout remain deployment or independent-assurance boundaries.
 
-### Phase 13 evidence boundary
+## Phase 16.5 — Production Readiness, Detection Validation & Design-Partner Gate
 
-Repository tests validate the identity and authorization implementation. A live customer OIDC provider, production database/IdP configuration review, external penetration test, hardware-backed key management and WebAuthn/passkey rollout remain deployment or independent-assurance boundaries.
+Phase 16.5 is an evidence gate rather than a feature-counting phase. The repository now carries an explicit gate document and CI workflow that executes the existing deterministic evaluation harness, validates the generated report artifact, uploads the reproducibility artifact, and runs the repository regression suite.
 
-## CI / workflow reconciliation
+The synthetic benchmark remains an **internal regression gate**. It must not be presented as real-world detection performance. Representative labeled traffic, external datasets, threat-informed/purple-team evaluation, deployment-host measurements, live identity configuration and independent assurance remain evidence boundaries.
 
-Primary CI contains deterministic repository validation and test gates. Phase 7 performance measurements run in the dedicated performance workflow. Phase 8 experimental governance remains isolated from production inference. Phase 13 identity validation is part of the repository security gate. Historical failures from retired workflow definitions are not current validation evidence.
+### Current evidence boundary
+
+The existing detection evaluation framework reports classification, ranking, calibration, latency and bootstrap uncertainty. The current synthetic benchmark uses five declared scenarios with deterministic repeated runs. The repository also provides ground-truth contracts and leakage controls for future labeled corpora.
+
+Phase 16.5 does not declare production detection effectiveness until a reproducible execution artifact exists and the required representative evidence has been evaluated.
 
 ## Remaining program work
 
-The next major milestone is **Detection-to-SOC field validation / fleet operations / enterprise deployment validation**. This requires real traffic, real sensors, deployment-host performance measurements, live IdP configuration, operational integration testing and independent assurance. Repository CI success does not imply those external validations.
+The immediate milestone is **Detection-to-SOC field validation / fleet operations / enterprise deployment validation**. This requires execution artifacts, representative real traffic, real sensor deployment, deployment-host performance measurements, live IdP configuration, operational integration testing and independent assurance.
