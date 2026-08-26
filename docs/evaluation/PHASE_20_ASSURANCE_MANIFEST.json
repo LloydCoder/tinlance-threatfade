@@ -1,0 +1,56 @@
+{
+  "phase": "20",
+  "title": "Independent Assurance",
+  "status": "preparation-ready",
+  "external_validation": "not_completed",
+  "certification": "not_claimed",
+  "claims": [
+    {
+      "claim": "ThreatFade behavioral fade detection capability is implemented",
+      "status": "implemented",
+      "evidence": ["repository", "unit-tests", "phase16.5-validation"]
+    },
+    {
+      "claim": "ThreatFade detection behavior is internally validated against governed scenarios",
+      "status": "internally-validated",
+      "evidence": ["phase16.5-validation", "detection-evaluation"]
+    },
+    {
+      "claim": "ThreatFade detection has been externally validated",
+      "status": "not-validated",
+      "evidence": []
+    },
+    {
+      "claim": "ThreatFade has undergone an independent penetration test",
+      "status": "not-validated",
+      "evidence": []
+    },
+    {
+      "claim": "ThreatFade has an independent security certification or attestation",
+      "status": "not-claimed",
+      "evidence": []
+    },
+    {
+      "claim": "ThreatFade has independently reproduced customer-scale performance results",
+      "status": "not-validated",
+      "evidence": []
+    }
+  ],
+  "evaluator_requirements": {
+    "independence": "evaluator controls blind labels/samples and execution",
+    "frozen_artifacts": true,
+    "signed_results": true,
+    "manifest_digest": true,
+    "deviation_log": true
+  },
+  "required_evidence": [
+    "evaluator-identity",
+    "scope-and-rules-of-engagement",
+    "frozen-corpus-manifest",
+    "detector-artifact-digest",
+    "blind-test-set-digest",
+    "reproducible-environment",
+    "raw-results",
+    "signed-final-report"
+  ]
+}
