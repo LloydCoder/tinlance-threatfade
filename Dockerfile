@@ -13,12 +13,17 @@ LABEL org.opencontainers.image.source="https://github.com/LloydCoder/tinlance-th
       org.opencontainers.image.description="Open-core network threat detection oracle" \
       org.opencontainers.image.licenses="Apache-2.0"
 
-# The official Python base is built from the current Debian security
-# repositories. Do not add an update-only apt layer. Packaging components are
-# explicitly refreshed because image scanners may otherwise retain vulnerable
-# versions shipped in the upstream image metadata.
 RUN addgroup --system threatfade && adduser --system --ingroup threatfade threatfade
 WORKDIR /app
+
+# Refresh Debian security packages to the currently fixed Trixie versions.
+# These versions address the OpenSSL vulnerabilities rejected by the supply-chain gate.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       libssl3t64=3.5.7-1~deb13u2 \
+       openssl=3.5.7-1~deb13u2 \
+       openssl-provider-legacy=3.5.7-1~deb13u2 \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
 RUN python -m pip install --no-cache-dir --disable-pip-version-check --upgrade pip setuptools==84.0.0 msgpack==1.2.1 \
