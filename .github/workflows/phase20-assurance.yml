@@ -1,0 +1,47 @@
+name: Phase 20 Independent Assurance Preparation Gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, phase20-independent-assurance]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase20-assurance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  assurance-preparation:
+    name: Assurance preparation gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+
+      - name: Validate Phase 20 assurance package
+        run: python scripts/validate_phase20_assurance.py
+
+      - name: Run Phase 20 assurance tests
+        run: python -m pytest -q tests/test_phase20_assurance.py
+
+      - name: Verify required documents are tracked
+        run: |
+          test -f docs/evaluation/INDEPENDENT_VALIDATION_PACKAGE.md
+          test -f docs/evaluation/PHASE_20_ASSURANCE_MANIFEST.json
+          test -f docs/evaluation/PENTEST_SCOPE.md
+          test -f docs/evaluation/PURPLE_TEAM_PROTOCOL.md
+          test -f docs/evaluation/SCALE_BENCHMARK_PROTOCOL.md
