@@ -2,8 +2,8 @@
 
 **Program:** Enterprise Hardening  
 **Current release baseline:** v0.9.0-dev  
-**Current phase:** Phase 16.5 — Production Readiness, Detection Validation & Design-Partner Gate  
-**Status:** PHASE 16.5 IN PROGRESS — repository validation infrastructure is being reconciled; real-world labeled-traffic validation, live deployment configuration and independent assurance remain external evidence boundaries.
+**Current phase:** Phase 20 — Independent Assurance Preparation  
+**Status:** PHASE 20 PREPARATION READY — repository validation infrastructure is in place; independent execution, live customer deployment evidence and external assurance remain explicitly uncompleted evidence boundaries.
 
 ## Completed groups
 
@@ -47,16 +47,18 @@ A live customer OIDC provider, production database/IdP configuration review, ext
 
 ## Phase 16.5 — Production Readiness, Detection Validation & Design-Partner Gate
 
-Phase 16.5 is an evidence gate rather than a feature-counting phase. The repository now carries an explicit gate document and CI workflow that executes the existing deterministic evaluation harness, validates the generated report artifact, uploads the reproducibility artifact, and runs the repository regression suite.
+Phase 16.5 established the evidence gate and deterministic evaluation infrastructure that Phase 20 now packages for independent execution. Its synthetic benchmark remains an **internal regression gate** and must not be presented as real-world detection performance.
 
-The synthetic benchmark remains an **internal regression gate**. It must not be presented as real-world detection performance. Representative labeled traffic, external datasets, threat-informed/purple-team evaluation, deployment-host measurements, live identity configuration and independent assurance remain evidence boundaries.
+## Phase 20 — Independent Assurance
 
-### Current evidence boundary
+Phase 20 preparation is GREEN at the repository level. The repository contains the independent detection validation package, penetration-test scope, scale benchmark protocol, purple-team protocol, fail-closed assurance manifest and automated assurance gate.
 
-The existing detection evaluation framework reports classification, ranking, calibration, latency and bootstrap uncertainty. The current synthetic benchmark uses five declared scenarios with deterministic repeated runs. The repository also provides ground-truth contracts and leakage controls for future labeled corpora.
+The assurance manifest explicitly records external detection validation, independent penetration testing, independent certification/attestation and independently reproduced customer-scale performance as incomplete. Repository preparation therefore does not promote those claims.
 
-Phase 16.5 does not declare production detection effectiveness until a reproducible execution artifact exists and the required representative evidence has been evaluated.
+## Current evidence boundary
+
+The current internal evidence includes deterministic regression/evaluation infrastructure, detector and platform tests, bounded performance workflows and documented security/assurance preparation. Representative labeled real traffic, independent evaluator execution, live customer identity/infrastructure configuration and production-scale field measurements remain external evidence boundaries.
 
 ## Remaining program work
 
-The immediate milestone is **Detection-to-SOC field validation / fleet operations / enterprise deployment validation**. This requires execution artifacts, representative real traffic, real sensor deployment, deployment-host performance measurements, live IdP configuration, operational integration testing and independent assurance.
+The next milestone is **external execution of the frozen assurance package and controlled field validation**. This requires an independent evaluator, representative datasets/traffic, real sensor deployment, deployment-host measurements, live IdP/database configuration review and any required third-party integration credentials. None of these should be represented as completed until execution artifacts are attached and verified.
