@@ -91,3 +91,85 @@ jobs:
           python scripts/validate_security_architecture.py
           pytest -q tests/test_environment_profile.py
       # Keep the final gate explicitly dependent on the checked-in security baseline.
+
+  schema-reconciliation-postgres:
+    name: PostgreSQL schema reconciliation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: threatfade
+          POSTGRES_USER: threatfade
+          POSTGRES_PASSWORD: threatfade-ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U threatfade -d threatfade"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      THREATFADE_ENV: development
+      THREATFADE_DATABASE_URL: postgresql+psycopg://threatfade:threatfade-ci@127.0.0.1:5432/threatfade
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Upgrade schema from historical migrations
+        run: python -m alembic upgrade head
+      - name: Alembic schema drift check
+        run: python -m alembic check
+      - name: Verify PostgreSQL schema and RLS read-only
+        run: |
+          python - <<'PY'
+          import os
+          import psycopg
+
+          expected_tables = {"environment_profiles", "environment_profile_audit"}
+          expected_indexes = {
+              "ix_environment_profiles_tenant",
+              "ix_environment_profiles_active",
+              "ix_environment_profile_audit_tenant",
+          }
+          expected_constraints = {"uq_environment_profiles_version"}
+          expected_policies = {
+              "environment_profiles_tenant_isolation",
+              "environment_profile_audit_tenant_isolation",
+          }
+
+          with psycopg.connect(os.environ["THREATFADE_DATABASE_URL"]) as conn:
+              with conn.cursor() as cur:
+                  cur.execute("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename IN ('environment_profiles', 'environment_profile_audit')")
+                  assert {row[0] for row in cur.fetchall()} == expected_tables
+
+                  cur.execute("SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND indexname IN ('ix_environment_profiles_tenant', 'ix_environment_profiles_active', 'ix_environment_profile_audit_tenant')")
+                  assert {row[0] for row in cur.fetchall()} == expected_indexes
+
+                  cur.execute("SELECT conname FROM pg_constraint WHERE conname = 'uq_environment_profiles_version'")
+                  assert {row[0] for row in cur.fetchall()} == expected_constraints
+
+                  cur.execute("SELECT relname, relrowsecurity, relforcerowsecurity FROM pg_class WHERE relname IN ('environment_profiles', 'environment_profile_audit')")
+                  rls = {row[0]: (row[1], row[2]) for row in cur.fetchall()}
+                  assert rls == {
+                      "environment_profiles": (True, True),
+                      "environment_profile_audit": (True, True),
+                  }
+
+                  cur.execute("SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND policyname IN ('environment_profiles_tenant_isolation', 'environment_profile_audit_tenant_isolation')")
+                  assert {row[0] for row in cur.fetchall()} == expected_policies
+
+          print("PostgreSQL schema, unique constraint, RLS, FORCE RLS and tenant policies verified")
+          PY
