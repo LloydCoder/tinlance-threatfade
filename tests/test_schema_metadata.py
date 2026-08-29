@@ -114,3 +114,29 @@ def test_historical_unique_constraints_are_named():
         if isinstance(constraint, UniqueConstraint)
     }
     assert expected <= actual
+
+
+def test_historical_unique_columns_are_constraints_not_unique_indexes():
+    expected = {
+        ("detection_workflow", ("detection_id",)),
+        ("identity_users", ("subject",)),
+        ("identity_organizations", ("slug",)),
+        ("identity_invitations", ("token_hash",)),
+        ("identity_sessions", ("token_hash",)),
+    }
+    for table_name, columns in expected:
+        table = Base.metadata.tables[table_name]
+        assert any(
+            isinstance(constraint, UniqueConstraint)
+            and tuple(column.name for column in constraint.columns) == columns
+            for constraint in table.constraints
+        )
+        assert any(
+            index.unique is False
+            and tuple(column.name for column in index.columns) == columns
+            for index in table.indexes
+        )
+        assert not any(
+            index.unique is True and tuple(column.name for column in index.columns) == columns
+            for index in table.indexes
+        )
