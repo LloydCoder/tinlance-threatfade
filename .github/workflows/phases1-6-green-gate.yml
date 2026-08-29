@@ -135,7 +135,6 @@ jobs:
       - name: Verify PostgreSQL schema and RLS read-only
         run: |
           python - <<'PY'
-          import os
           import psycopg
 
           expected_tables = {"environment_profiles", "environment_profile_audit"}
@@ -150,7 +149,13 @@ jobs:
               "environment_profile_audit_tenant_isolation",
           }
 
-          with psycopg.connect(os.environ["THREATFADE_DATABASE_URL"]) as conn:
+          with psycopg.connect(
+              host="127.0.0.1",
+              port=5432,
+              dbname="threatfade",
+              user="threatfade",
+              password="threatfade-ci",
+          ) as conn:
               with conn.cursor() as cur:
                   cur.execute("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename IN ('environment_profiles', 'environment_profile_audit')")
                   assert {row[0] for row in cur.fetchall()} == expected_tables
