@@ -139,7 +139,7 @@ def _ensure_index(table, columns: tuple[str, ...], canonical_name: str) -> None:
         if _columns_key(index) == columns:
             index.name = canonical_name
             return
-    Index(canonical_name, table, *(table.c[column] for column in columns))
+    Index(canonical_name, *(table.c[column] for column in columns))
 
 
 def _reconcile_unique_constraint(table, columns: tuple[str, ...], canonical_name: str) -> None:
@@ -161,9 +161,9 @@ def _reconcile_unique_constraint(table, columns: tuple[str, ...], canonical_name
 
 
 def reconcile_metadata() -> None:
-    # Restore the established names for indexes already represented by mapped
-    # columns. If an historical index was not declared by the current model,
-    # represent that known database index explicitly in metadata.
+    # Restore established names for mapped-column indexes. If an historical
+    # index was not declared by the current model, represent that known index
+    # explicitly in metadata so Alembic can compare it to the database.
     for table_name, names in _SINGLE_INDEXES.items():
         table = Base.metadata.tables[table_name]
         for column_name, canonical_name in names.items():
