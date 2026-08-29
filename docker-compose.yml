@@ -14,12 +14,22 @@ services:
       timeout: 5s
       retries: 5
 
+  audit-init:
+    image: alpine:3.22
+    restart: "no"
+    user: "0:0"
+    command: ["sh", "-ec", "mkdir -p /var/lib/threatfade/audit && chown -R 100:101 /var/lib/threatfade/audit && chmod 0750 /var/lib/threatfade/audit"]
+    volumes:
+      - audit_data:/var/lib/threatfade/audit
+
   threatfade:
     build: .
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
+      audit-init:
+        condition: service_completed_successfully
     environment:
       THREATFADE_ENV: production
       THREATFADE_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-threatfade}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-threatfade}
