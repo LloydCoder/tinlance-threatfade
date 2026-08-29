@@ -29,10 +29,6 @@ def _test_database_url() -> tuple[str, URL] | None:
     """Return a safe disposable PostgreSQL URL when one is configured."""
     explicit = os.getenv("TEST_DATABASE_URL")
     source = explicit or os.getenv("THREATFADE_DATABASE_URL")
-
-    # Some CI jobs intentionally run without PostgreSQL. Preserve their normal
-    # SQLite behavior rather than making the entire repository require a DB
-    # service merely because the identity tests can use PostgreSQL.
     if not source:
         return None
 
@@ -90,40 +86,65 @@ def _terminate_and_drop(engine, name: str) -> None:
         conn.execute(text("DROP DATABASE IF EXISTS \"" + name.replace('"', '""') + "\""))
 
 
+def _dispose_test_database(target: URL) -> None:
+    name = target.database
+    if not name or not name.startswith(TEST_DB_PREFIX):
+        return
+    maintenance = create_engine(_maintenance_url(target), pool_pre_ping=True)
+    try:
+        if _database_exists(maintenance, name):
+            _terminate_and_drop(maintenance, name)
+    finally:
+        maintenance.dispose()
+
+
 def pytest_sessionstart(session: pytest.Session) -> None:
     configured = _test_database_url()
     if configured is None:
         return
 
     url, target = configured
-    maintenance = create_engine(_maintenance_url(target), pool_pre_ping=True)
     name = target.database
     assert name is not None
 
-    # A stale test database from an interrupted run is disposable by design.
-    if _database_exists(maintenance, name):
-        _terminate_and_drop(maintenance, name)
-    with maintenance.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-        conn.execute(text("CREATE DATABASE \"" + name.replace('"', '""') + "\""))
-    maintenance.dispose()
-
     original_database_url = os.environ.get("THREATFADE_DATABASE_URL")
     original_test_database_url = os.environ.get("TEST_DATABASE_URL")
-    os.environ["THREATFADE_DATABASE_URL"] = url
-    os.environ["TEST_DATABASE_URL"] = url
-
-    subprocess.run(
-        [sys.executable, "-m", "alembic", "upgrade", "head"],
-        cwd=REPO_ROOT,
-        env=os.environ.copy(),
-        check=True,
-    )
-
     session.config._threatfade_test_database = (
         target,
         original_database_url,
         original_test_database_url,
     )
+
+    maintenance = create_engine(_maintenance_url(target), pool_pre_ping=True)
+    try:
+        if _database_exists(maintenance, name):
+            _terminate_and_drop(maintenance, name)
+        with maintenance.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            conn.execute(text("CREATE DATABASE \"" + name.replace('"', '""') + "\""))
+    except Exception:
+        # The database was created only for this test session. If setup fails,
+        # remove it immediately rather than leaving a persistent test database.
+        try:
+            _dispose_test_database(target)
+        finally:
+            maintenance.dispose()
+        raise
+    finally:
+        maintenance.dispose()
+
+    os.environ["THREATFADE_DATABASE_URL"] = url
+    os.environ["TEST_DATABASE_URL"] = url
+
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "alembic", "upgrade", "head"],
+            cwd=REPO_ROOT,
+            env=os.environ.copy(),
+            check=True,
+        )
+    except Exception:
+        _dispose_test_database(target)
+        raise
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
@@ -133,10 +154,7 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
 
     target, original_database_url, original_test_database_url = value
     try:
-        maintenance = create_engine(_maintenance_url(target), pool_pre_ping=True)
-        if target.database and target.database.startswith(TEST_DB_PREFIX):
-            _terminate_and_drop(maintenance, target.database)
-        maintenance.dispose()
+        _dispose_test_database(target)
     finally:
         if original_database_url is None:
             os.environ.pop("THREATFADE_DATABASE_URL", None)
