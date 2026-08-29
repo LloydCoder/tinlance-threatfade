@@ -15,6 +15,7 @@ from core.storage import Base
 _LEGACY_BASELINE_TABLES = frozenset(Base.metadata.tables)
 
 from core.orm import Base as ORMBase
+from core.schema_contract import reconcile_metadata
 
 assert ORMBase is Base
 
@@ -27,11 +28,12 @@ if url:
     config.set_main_option("sqlalchemy.url", url.replace("%", "%%"))
 
 # Alembic/autogenerate receives an independent complete metadata snapshot.
-# Historical migrations continue to operate against the original Base without
-# being rewritten or made aware of later ORM tables.
+# Table.to_metadata() regenerates convention-derived index names, so reapply
+# the established database contract to the cloned metadata after copying it.
 target_metadata = MetaData()
 for table in Base.metadata.sorted_tables:
     table.to_metadata(target_metadata)
+reconcile_metadata(target_metadata)
 
 
 def _prepare_historical_migration_base() -> None:
