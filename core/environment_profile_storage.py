@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from sqlalchemy import DateTime, Index, Integer, String, Text, UniqueConstraint, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
-from core.environment_profile import EnvironmentProfile, validate_profile
+from core.environment_profile import EnvironmentProfile, SensitivityThresholds, validate_profile
 from core.storage import Base, ENGINE, set_tenant_context
 
 
@@ -63,6 +63,12 @@ class EnvironmentProfileAuditRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+if ENGINE.dialect.name == "sqlite":
+    # SQLite is the local developer/test store. Production PostgreSQL remains
+    # migration-owned and therefore never receives ORM create_all DDL.
+    Base.metadata.create_all(ENGINE)
+
+
 def _authorize(tenant_id: str, actor_tenant: str) -> None:
     if not tenant_id or len(tenant_id) > 255:
         raise ValueError("invalid tenant_id")
@@ -73,6 +79,9 @@ def _authorize(tenant_id: str, actor_tenant: str) -> None:
 def _record_to_domain(row: EnvironmentProfileRecord) -> EnvironmentProfile:
     payload = json.loads(row.profile_json)
     payload["created_at"] = datetime.fromisoformat(payload["created_at"])
+    sensitivity = payload.get("sensitivity")
+    if isinstance(sensitivity, dict):
+        payload["sensitivity"] = SensitivityThresholds(**sensitivity)
     return EnvironmentProfile(**payload)
 
 
