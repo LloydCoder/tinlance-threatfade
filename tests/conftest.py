@@ -50,7 +50,7 @@ def _test_database_url() -> tuple[str, URL] | None:
             base_name = f"{TEST_DB_PREFIX}{base_name}"
         name = f"{base_name}{suffix}"
     else:
-        name = f"{TEST_DB_PREFIX.rstrip('_')}{suffix}" if worker else TEST_DB_PREFIX.rstrip("_")
+        name = f"{TEST_DB_PREFIX}default{suffix}"
 
     if not name.startswith(TEST_DB_PREFIX):
         pytest.exit("Refusing to use a database outside the threatfade_test_* namespace.")
