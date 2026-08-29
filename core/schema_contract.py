@@ -1,12 +1,11 @@
 """Normalize ORM metadata to the established Alembic/database contract.
 
 Historical migrations are authoritative. This module changes SQLAlchemy metadata
-names only; it performs no database DDL and must be imported after all ORM model
-modules have been imported.
+only; it performs no database DDL and must be imported after all ORM model modules.
 """
 from __future__ import annotations
 
-from sqlalchemy import Index
+from sqlalchemy import Index, UniqueConstraint
 
 from core.storage import Base
 
@@ -106,11 +105,6 @@ _COMPOSITE_INDEXES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("evidence", "ix_evidence_tenant_correlation", ("tenant_id", "correlation_id")),
     ("provenance", "ix_provenance_tenant_correlation", ("tenant_id", "correlation_id")),
     ("investigation_timeline", "ix_timeline_tenant_case", ("tenant_id", "case_id", "created_at")),
-    ("detections", "ix_detections_input_sha256", ("input_sha256",)),
-    ("detections", "ix_detections_rule_pack_sha256", ("rule_pack_sha256",)),
-    ("detections", "ix_detections_engine_version", ("engine_version",)),
-    ("detections", "ix_detections_model_sha256", ("model_sha256",)),
-    ("detections", "ix_detections_config_sha256", ("config_sha256",)),
 )
 
 _UNIQUE_CONSTRAINTS: dict[tuple[str, tuple[str, ...]], str] = {
@@ -127,33 +121,64 @@ _UNIQUE_CONSTRAINTS: dict[tuple[str, tuple[str, ...]], str] = {
     ("identity_sessions", ("token_hash",)): "identity_sessions_token_hash_key",
 }
 
+_UNIQUE_CONSTRAINT_WITH_INDEX: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("detection_workflow", ("detection_id",)),
+    ("identity_users", ("subject",)),
+    ("identity_organizations", ("slug",)),
+    ("identity_invitations", ("token_hash",)),
+    ("identity_sessions", ("token_hash",)),
+)
+
 
 def _columns_key(index: Index) -> tuple[str, ...]:
     return tuple(column.name for column in index.columns)
 
 
+def _ensure_index(table, columns: tuple[str, ...], canonical_name: str) -> None:
+    for index in table.indexes:
+        if _columns_key(index) == columns:
+            index.name = canonical_name
+            return
+    Index(canonical_name, table, *(table.c[column] for column in columns))
+
+
+def _reconcile_unique_constraint(table, columns: tuple[str, ...], canonical_name: str) -> None:
+    for constraint in table.constraints:
+        if isinstance(constraint, UniqueConstraint) and tuple(column.name for column in constraint.columns) == columns:
+            constraint.name = canonical_name
+            return
+
+    unique_index = next(
+        (index for index in table.indexes if index.unique and _columns_key(index) == columns),
+        None,
+    )
+    if unique_index is not None:
+        table.indexes.remove(unique_index)
+        table.append_constraint(UniqueConstraint(*(table.c[column] for column in columns), name=canonical_name))
+        return
+
+    table.append_constraint(UniqueConstraint(*(table.c[column] for column in columns), name=canonical_name))
+
+
 def reconcile_metadata() -> None:
+    # Restore the established names for indexes already represented by mapped
+    # columns. If an historical index was not declared by the current model,
+    # represent that known database index explicitly in metadata.
     for table_name, names in _SINGLE_INDEXES.items():
         table = Base.metadata.tables[table_name]
-        by_columns = {_columns_key(index): index for index in table.indexes}
         for column_name, canonical_name in names.items():
-            index = by_columns.get((column_name,))
-            if index is not None:
-                index.name = canonical_name
-            else:
-                Index(canonical_name, table, table.c[column_name])
+            _ensure_index(table, (column_name,), canonical_name)
 
     for table_name, canonical_name, columns in _COMPOSITE_INDEXES:
-        table = Base.metadata.tables[table_name]
-        if not any(index.name == canonical_name for index in table.indexes):
-            Index(canonical_name, table, *(table.c[column] for column in columns))
+        _ensure_index(Base.metadata.tables[table_name], columns, canonical_name)
 
     for (table_name, columns), canonical_name in _UNIQUE_CONSTRAINTS.items():
         table = Base.metadata.tables[table_name]
-        for constraint in table.constraints:
-            if tuple(column.name for column in constraint.columns) == columns and constraint.__class__.__name__ == "UniqueConstraint":
-                constraint.name = canonical_name
-                break
+        _reconcile_unique_constraint(table, columns, canonical_name)
+
+    for table_name, columns in _UNIQUE_CONSTRAINT_WITH_INDEX:
+        table = Base.metadata.tables[table_name]
+        _ensure_index(table, columns, _SINGLE_INDEXES[table_name][columns[0]])
 
 
 reconcile_metadata()
