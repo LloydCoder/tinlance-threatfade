@@ -27,8 +27,24 @@ jobs:
         python-version:
           - '3.11'
           - '3.12'
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: threatfade
+          POSTGRES_PASSWORD: threatfade_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U threatfade -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     env:
       PYTHONPATH: ${{ github.workspace }}
+      THREATFADE_ENV: development
+      TEST_DATABASE_URL: postgresql+psycopg://threatfade:threatfade_ci@localhost:5432/threatfade_test
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -59,8 +75,14 @@ jobs:
         run: python scripts/validate_ground_truth.py
       - name: Validate reliability architecture
         run: python scripts/validate_reliability.py
-      - name: Run test suite
-        run: python -m pytest -q
+      - name: Run test suite twice
+        run: |
+          python -m pytest -q
+          python -m pytest -q
+      - name: Verify Alembic state
+        run: |
+          alembic current
+          alembic check
       - name: Run benchmark smoke test
         run: python benchmarks/benchmark.py
       - name: Run Detection Science 2.0 benchmark
