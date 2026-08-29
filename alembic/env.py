@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from logging.config import fileConfig
+import copy
 import os
 
 from alembic import context
@@ -15,7 +16,6 @@ from core.storage import Base
 _LEGACY_BASELINE_TABLES = frozenset(Base.metadata.tables)
 
 from core.orm import Base as ORMBase
-from core.schema_contract import reconcile_metadata
 
 assert ORMBase is Base
 
@@ -28,12 +28,10 @@ if url:
     config.set_main_option("sqlalchemy.url", url.replace("%", "%%"))
 
 # Alembic/autogenerate receives an independent complete metadata snapshot.
-# Table.to_metadata() regenerates convention-derived index names, so reapply
-# the established database contract to the cloned metadata after copying it.
-target_metadata = MetaData()
-for table in Base.metadata.sorted_tables:
-    table.to_metadata(target_metadata)
-reconcile_metadata(target_metadata)
+# deepcopy preserves explicit historical index names and the distinction
+# between UniqueConstraint objects and ordinary indexes; Table.to_metadata()
+# can regenerate names from Column(index=True) during the copy.
+target_metadata: MetaData = copy.deepcopy(Base.metadata)
 
 
 def _prepare_historical_migration_base() -> None:
