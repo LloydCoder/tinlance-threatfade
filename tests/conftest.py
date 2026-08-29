@@ -34,10 +34,9 @@ def _test_database_url() -> tuple[str, URL] | None:
 
     base = make_url(source)
     if base.get_backend_name() != "postgresql":
-        pytest.exit(
-            "PostgreSQL test isolation requires TEST_DATABASE_URL or "
-            "THREATFADE_DATABASE_URL to use a postgresql+psycopg URL."
-        )
+        # Some lightweight validation workflows intentionally use SQLite and
+        # do not provision PostgreSQL. Preserve their existing behavior.
+        return None
 
     if os.getenv("THREATFADE_ENV", "development").lower() == "production" and not explicit:
         pytest.exit("Refusing to derive a test database from a production database URL.")
@@ -122,8 +121,6 @@ def pytest_sessionstart(session: pytest.Session) -> None:
         with maintenance.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
             conn.execute(text("CREATE DATABASE \"" + name.replace('"', '""') + "\""))
     except Exception:
-        # The database was created only for this test session. If setup fails,
-        # remove it immediately rather than leaving a persistent test database.
         try:
             _dispose_test_database(target)
         finally:
