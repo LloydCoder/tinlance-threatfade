@@ -1,9 +1,13 @@
-"""Pytest database isolation for the PostgreSQL-backed test suite.
+"""Safe, disposable database isolation for PostgreSQL-backed test runs.
 
-Tests must never run against the production PostgreSQL database.  A disposable
-PostgreSQL database is created for each pytest session (and per xdist worker),
-upgraded with the existing Alembic migrations, and removed when the session
-ends.  Production application configuration is not changed.
+When a PostgreSQL test URL is explicitly supplied, pytest creates a disposable
+``threatfade_test_*`` database, upgrades it with the existing Alembic
+migrations, and removes it at session end. Production application configuration
+and production schemas are never modified.
+
+Test workflows that do not provide a PostgreSQL URL intentionally keep the
+repository's normal local SQLite behavior; this is required for lightweight
+unit/governance workflows that do not provision PostgreSQL.
 """
 from __future__ import annotations
 
@@ -21,37 +25,37 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 TEST_DB_PREFIX = "threatfade_test_"
 
 
-def _test_database_url() -> tuple[str, URL]:
-    """Return a safe disposable PostgreSQL URL and its parsed form."""
+def _test_database_url() -> tuple[str, URL] | None:
+    """Return a safe disposable PostgreSQL URL when one is configured."""
     explicit = os.getenv("TEST_DATABASE_URL")
     source = explicit or os.getenv("THREATFADE_DATABASE_URL")
+
+    # Some CI jobs intentionally run without PostgreSQL. Preserve their normal
+    # SQLite behavior rather than making the entire repository require a DB
+    # service merely because the identity tests can use PostgreSQL.
     if not source:
-        pytest.exit(
-            "PostgreSQL test isolation requires TEST_DATABASE_URL (or "
-            "THREATFADE_DATABASE_URL for non-production development runs)."
-        )
+        return None
 
     base = make_url(source)
     if base.get_backend_name() != "postgresql":
         pytest.exit(
-            "Identity tests require PostgreSQL test isolation; "
-            "TEST_DATABASE_URL must use a postgresql+psycopg URL."
+            "PostgreSQL test isolation requires TEST_DATABASE_URL or "
+            "THREATFADE_DATABASE_URL to use a postgresql+psycopg URL."
         )
 
-    if os.getenv("THREATFADE_ENV", "development").lower() == "production":
-        if not explicit:
-            pytest.exit("Refusing to derive a test database from a production database URL.")
+    if os.getenv("THREATFADE_ENV", "development").lower() == "production" and not explicit:
+        pytest.exit("Refusing to derive a test database from a production database URL.")
 
     worker = os.getenv("PYTEST_XDIST_WORKER")
     suffix = f"_{worker}" if worker else ""
-    name = f"{TEST_DB_PREFIX.rstrip('_')}{suffix}" if worker else TEST_DB_PREFIX.rstrip("_")
-    # Explicit TEST_DATABASE_URL supplies the base test database name; xdist
-    # workers get deterministic isolated databases derived from it.
+
     if explicit:
         base_name = base.database or "threatfade_test"
         if not base_name.startswith(TEST_DB_PREFIX):
             base_name = f"{TEST_DB_PREFIX}{base_name}"
         name = f"{base_name}{suffix}"
+    else:
+        name = f"{TEST_DB_PREFIX.rstrip('_')}{suffix}" if worker else TEST_DB_PREFIX.rstrip("_")
 
     if not name.startswith(TEST_DB_PREFIX):
         pytest.exit("Refusing to use a database outside the threatfade_test_* namespace.")
@@ -87,7 +91,11 @@ def _terminate_and_drop(engine, name: str) -> None:
 
 
 def pytest_sessionstart(session: pytest.Session) -> None:
-    url, target = _test_database_url()
+    configured = _test_database_url()
+    if configured is None:
+        return
+
+    url, target = configured
     maintenance = create_engine(_maintenance_url(target), pool_pre_ping=True)
     name = target.database
     assert name is not None
@@ -99,6 +107,8 @@ def pytest_sessionstart(session: pytest.Session) -> None:
         conn.execute(text("CREATE DATABASE \"" + name.replace('"', '""') + "\""))
     maintenance.dispose()
 
+    original_database_url = os.environ.get("THREATFADE_DATABASE_URL")
+    original_test_database_url = os.environ.get("TEST_DATABASE_URL")
     os.environ["THREATFADE_DATABASE_URL"] = url
     os.environ["TEST_DATABASE_URL"] = url
 
@@ -109,20 +119,31 @@ def pytest_sessionstart(session: pytest.Session) -> None:
         check=True,
     )
 
-    session.config._threatfade_test_database = (target,)
+    session.config._threatfade_test_database = (
+        target,
+        original_database_url,
+        original_test_database_url,
+    )
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     value = getattr(session.config, "_threatfade_test_database", None)
     if not value:
         return
-    target = value[0]
+
+    target, original_database_url, original_test_database_url = value
     try:
         maintenance = create_engine(_maintenance_url(target), pool_pre_ping=True)
         if target.database and target.database.startswith(TEST_DB_PREFIX):
             _terminate_and_drop(maintenance, target.database)
         maintenance.dispose()
     finally:
-        # Do not leave a test-only database URL in the parent process's
-        # environment for code invoked by later pytest hooks.
-        os.environ.pop("TEST_DATABASE_URL", None)
+        if original_database_url is None:
+            os.environ.pop("THREATFADE_DATABASE_URL", None)
+        else:
+            os.environ["THREATFADE_DATABASE_URL"] = original_database_url
+
+        if original_test_database_url is None:
+            os.environ.pop("TEST_DATABASE_URL", None)
+        else:
+            os.environ["TEST_DATABASE_URL"] = original_test_database_url
