@@ -5,6 +5,12 @@ When a PostgreSQL test URL is explicitly supplied, pytest creates a disposable
 migrations, and removes it at session end. Production application configuration
 and production schemas are never modified.
 
+PostgreSQL database lifecycle operations (CREATE/DROP DATABASE) may require a
+separate maintenance credential. ``TEST_DATABASE_ADMIN_URL`` is therefore used
+for database lifecycle operations when supplied, while ``TEST_DATABASE_URL`` is
+used by the test database itself. This keeps the production application role
+from needing CREATEDB privileges.
+
 Test workflows that do not provide a PostgreSQL URL intentionally keep the
 repository's normal local SQLite behavior; this is required for lightweight
 unit/governance workflows that do not provision PostgreSQL.
@@ -60,6 +66,24 @@ def _test_database_url() -> tuple[str, URL] | None:
 
 
 def _maintenance_url(target: URL) -> str:
+    """Return the maintenance connection URL for CREATE/DROP DATABASE.
+
+    ``TEST_DATABASE_ADMIN_URL`` may use a different PostgreSQL role from the
+    test/application role. The maintenance connection is always pinned to the
+    built-in ``postgres`` database so lifecycle operations never depend on the
+    disposable target database already existing.
+    """
+    configured = os.getenv("TEST_DATABASE_ADMIN_URL")
+    if configured:
+        admin = make_url(configured)
+        if admin.get_backend_name() != "postgresql":
+            pytest.exit("TEST_DATABASE_ADMIN_URL must use PostgreSQL.")
+        return admin.set(database="postgres").render_as_string(hide_password=False)
+
+    # Backward-compatible fallback for local/CI environments where the test
+    # role itself is intentionally privileged. Production app roles should not
+    # be granted CREATEDB; production-like test runs should provide the
+    # separate TEST_DATABASE_ADMIN_URL explicitly.
     return target.set(database="postgres").render_as_string(hide_password=False)
 
 
@@ -85,11 +109,13 @@ def _terminate_and_drop(engine, name: str) -> None:
         conn.execute(text("DROP DATABASE IF EXISTS \"" + name.replace('"', '""') + "\""))
 
 
-def _dispose_test_database(target: URL) -> None:
+def _dispose_test_database(target: URL, maintenance_url: str | None = None) -> None:
     name = target.database
     if not name or not name.startswith(TEST_DB_PREFIX):
         return
-    maintenance = create_engine(_maintenance_url(target), pool_pre_ping=True)
+    maintenance = create_engine(
+        maintenance_url or _maintenance_url(target), pool_pre_ping=True
+    )
     try:
         if _database_exists(maintenance, name):
             _terminate_and_drop(maintenance, name)
@@ -105,16 +131,18 @@ def pytest_sessionstart(session: pytest.Session) -> None:
     url, target = configured
     name = target.database
     assert name is not None
+    maintenance_url = _maintenance_url(target)
 
     original_database_url = os.environ.get("THREATFADE_DATABASE_URL")
     original_test_database_url = os.environ.get("TEST_DATABASE_URL")
     session.config._threatfade_test_database = (
         target,
+        maintenance_url,
         original_database_url,
         original_test_database_url,
     )
 
-    maintenance = create_engine(_maintenance_url(target), pool_pre_ping=True)
+    maintenance = create_engine(maintenance_url, pool_pre_ping=True)
     try:
         if _database_exists(maintenance, name):
             _terminate_and_drop(maintenance, name)
@@ -122,7 +150,7 @@ def pytest_sessionstart(session: pytest.Session) -> None:
             conn.execute(text("CREATE DATABASE \"" + name.replace('"', '""') + "\""))
     except Exception:
         try:
-            _dispose_test_database(target)
+            _dispose_test_database(target, maintenance_url)
         finally:
             maintenance.dispose()
         raise
@@ -140,7 +168,7 @@ def pytest_sessionstart(session: pytest.Session) -> None:
             check=True,
         )
     except Exception:
-        _dispose_test_database(target)
+        _dispose_test_database(target, maintenance_url)
         raise
 
 
@@ -149,9 +177,9 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     if not value:
         return
 
-    target, original_database_url, original_test_database_url = value
+    target, maintenance_url, original_database_url, original_test_database_url = value
     try:
-        _dispose_test_database(target)
+        _dispose_test_database(target, maintenance_url)
     finally:
         if original_database_url is None:
             os.environ.pop("THREATFADE_DATABASE_URL", None)
