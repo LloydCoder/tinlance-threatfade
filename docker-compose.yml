@@ -50,8 +50,16 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
+    networks:
+      - default
+      - proxy
+
+networks:
+  proxy:
+    external: true
+    name: threatfade_proxy
 
 volumes:
   postgres_data:
