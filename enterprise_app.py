@@ -11,7 +11,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from api import app
 from core.enterprise_routes import router as enterprise_router
-from core.analyst_routes import router as analyst_router
 from core.health import readiness_state
 from core.observability import initialize_metrics, observe_http, metrics_app
 from core.reliability_routes import router as reliability_router
@@ -52,7 +51,6 @@ class ReliabilityMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(ReliabilityMiddleware)
 app.include_router(enterprise_router)
-app.include_router(analyst_router)
 app.include_router(reliability_router)
 
 _metrics = metrics_app()
