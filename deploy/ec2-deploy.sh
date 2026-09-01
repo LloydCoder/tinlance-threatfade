@@ -53,17 +53,40 @@ echo "Recreating application service only..."
 docker compose up -d --no-deps "$EXPECTED_SERVICE"
 echo "Service recreation: OK"
 
-echo "Waiting for health..."
+echo "Waiting for container health..."
 for _ in $(seq 1 30); do
-  if curl -fsS http://127.0.0.1:8080/health >/tmp/threatfade-health.json 2>/dev/null; then
-    cat /tmp/threatfade-health.json
-    echo
+  HEALTH_STATUS="$(
+    docker inspect "$EXPECTED_CONTAINER" \
+      --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}'
+  )"
+
+  echo "Container health: $HEALTH_STATUS"
+
+  if [[ "$HEALTH_STATUS" == "healthy" ]]; then
     break
   fi
+
+  if [[ "$HEALTH_STATUS" == "unhealthy" ]]; then
+    docker inspect "$EXPECTED_CONTAINER" \
+      --format '{{range .State.Health.Log}}{{.Start}} exit={{.ExitCode}} output={{.Output}}{{println}}{{end}}' \
+      | tail -5
+    fail "engine container became unhealthy"
+  fi
+
   sleep 2
 done
 
-curl -fsS http://127.0.0.1:8080/health >/dev/null || fail "engine health check failed"
+HEALTH_STATUS="$(
+  docker inspect "$EXPECTED_CONTAINER" \
+    --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}'
+)"
+
+[[ "$HEALTH_STATUS" == "healthy" ]] \
+  || fail "engine container did not become healthy"
+
+echo "Verifying /healthz inside container..."
+docker exec "$EXPECTED_CONTAINER" \
+  python -c 'import urllib.request; r=urllib.request.urlopen("http://127.0.0.1:8080/healthz", timeout=3); assert r.status == 200; print(r.read().decode())'
 
 docker inspect "$EXPECTED_CONTAINER" \
   --format 'Container={{.Name}} Status={{.State.Status}} Health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \
