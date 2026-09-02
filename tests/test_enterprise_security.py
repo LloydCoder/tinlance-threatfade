@@ -189,3 +189,71 @@ def test_oidc_validator_rejects_hs256_token():
     with pytest.raises(HTTPException) as exc:
         validator.validate(token)
     assert exc.value.status_code == 401
+
+
+def test_tenant_session_reapplies_rls_context_after_commit():
+    from sqlalchemy import select, text
+
+    from core.storage import CaseRecord, tenant_session
+
+    tenant_a = "tenant-rls-a"
+    tenant_b = "tenant-rls-b"
+
+    # Seed one row for each tenant through their own tenant-bound sessions.
+    with tenant_session(tenant_a) as session:
+        session.add(
+            CaseRecord(
+                tenant_id=tenant_a,
+                owner="user-a",
+                title="Tenant A case",
+                status="open",
+            )
+        )
+        session.commit()
+
+    with tenant_session(tenant_b) as session:
+        session.add(
+            CaseRecord(
+                tenant_id=tenant_b,
+                owner="user-b",
+                title="Tenant B case",
+                status="open",
+            )
+        )
+        session.commit()
+
+    # Verify that the tenant context is established automatically and is
+    # re-established when SQLAlchemy starts a new transaction after commit.
+    with tenant_session(tenant_a) as session:
+        first_context = session.scalar(
+            text("SELECT current_setting('threatfade.tenant_id', true)")
+        )
+        assert first_context == tenant_a
+
+        visible_first = list(
+            session.scalars(
+                select(CaseRecord).order_by(CaseRecord.id)
+            )
+        )
+        assert [row.tenant_id for row in visible_first] == [tenant_a]
+
+        session.commit()
+
+        second_context = session.scalar(
+            text("SELECT current_setting('threatfade.tenant_id', true)")
+        )
+        assert second_context == tenant_a
+
+        visible_second = list(
+            session.scalars(
+                select(CaseRecord).order_by(CaseRecord.id)
+            )
+        )
+        assert [row.tenant_id for row in visible_second] == [tenant_a]
+
+        # Even an explicitly guessed cross-tenant identifier must remain
+        # invisible because PostgreSQL RLS is the enforcement boundary.
+        guessed = session.scalar(
+            select(CaseRecord).where(CaseRecord.tenant_id == tenant_b)
+        )
+        assert guessed is None

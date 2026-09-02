@@ -11,13 +11,17 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+
 
 from core.api_security import enforce_rate_limit
 from core.enterprise import AUDIT, authenticate, authorize, require_tenant
 from core.storage import (
-    ENGINE, CaseCommentRecord, CaseEventRecord, CaseRecord, DetectionFeedbackRecord,
+    CaseCommentRecord,
+    CaseEventRecord,
+    CaseRecord,
+    DetectionFeedbackRecord,
     TenantConfigRecord,
+    tenant_session,
 )
 
 router = APIRouter(prefix="/enterprise", tags=["enterprise"])
@@ -62,7 +66,7 @@ class FeatureRequest(BaseModel):
 @router.post("/detections/{detection_id}/feedback")
 def submit_feedback(detection_id: int, req: FeedbackRequest, request: Request):
     principal, tenant_id = _principal(request, "case:write")
-    with Session(ENGINE) as session:
+    with tenant_session(tenant_id) as session:
         from core.storage import DetectionRecord
         detection = session.scalar(select(DetectionRecord).where(DetectionRecord.id == detection_id, DetectionRecord.tenant_id == tenant_id))
         if not detection:
@@ -88,7 +92,7 @@ def submit_feedback(detection_id: int, req: FeedbackRequest, request: Request):
 def list_feedback(request: Request, limit: int = 100):
     principal, tenant_id = _principal(request, "case:read")
     limit = max(1, min(limit, 500))
-    with Session(ENGINE) as session:
+    with tenant_session(tenant_id) as session:
         rows = list(session.scalars(select(DetectionFeedbackRecord).where(DetectionFeedbackRecord.tenant_id == tenant_id).order_by(DetectionFeedbackRecord.id.desc()).limit(limit)))
     return {"tenant_id": tenant_id, "items": [{"id": r.id, "detection_id": r.detection_id, "disposition": r.disposition, "note": r.note, "subject": r.subject, "created_at": r.created_at.isoformat()} for r in rows]}
 
@@ -97,7 +101,7 @@ def list_feedback(request: Request, limit: int = 100):
 def create_case(req: CaseRequest, request: Request):
     principal, tenant_id = _principal(request, "case:write")
     owner = req.owner or principal.subject
-    with Session(ENGINE) as session:
+    with tenant_session(tenant_id) as session:
         case = CaseRecord(tenant_id=tenant_id, owner=owner, title=req.title, status="open")
         session.add(case)
         session.flush()
@@ -111,7 +115,7 @@ def create_case(req: CaseRequest, request: Request):
 def get_cases(request: Request, limit: int = 100):
     principal, tenant_id = _principal(request, "case:read")
     limit = max(1, min(limit, 500))
-    with Session(ENGINE) as session:
+    with tenant_session(tenant_id) as session:
         rows = list(session.scalars(select(CaseRecord).where(CaseRecord.tenant_id == tenant_id).order_by(CaseRecord.id.desc()).limit(limit)))
     return {"tenant_id": tenant_id, "items": [{"id": r.id, "title": r.title, "owner": r.owner, "status": r.status, "created_at": r.created_at.isoformat()} for r in rows]}
 
@@ -121,7 +125,7 @@ def update_case(case_id: int, req: CaseUpdateRequest, request: Request):
     principal, tenant_id = _principal(request, "case:write")
     if req.status is None and req.owner is None:
         raise HTTPException(400, "At least one case field must be supplied")
-    with Session(ENGINE) as session:
+    with tenant_session(tenant_id) as session:
         case = session.scalar(select(CaseRecord).where(CaseRecord.id == case_id, CaseRecord.tenant_id == tenant_id))
         if not case: raise HTTPException(404, "Case not found")
         if req.status is not None: case.status = req.status
@@ -135,11 +139,12 @@ def update_case(case_id: int, req: CaseUpdateRequest, request: Request):
 @router.post("/cases/{case_id}/comments")
 def add_comment(case_id: int, req: CommentRequest, request: Request):
     principal, tenant_id = _principal(request, "case:write")
-    with Session(ENGINE) as session:
+    with tenant_session(tenant_id) as session:
         case = session.scalar(select(CaseRecord).where(CaseRecord.id == case_id, CaseRecord.tenant_id == tenant_id))
         if not case: raise HTTPException(404, "Case not found")
         comment = CaseCommentRecord(tenant_id=tenant_id, case_id=case_id, author=principal.subject, body=req.body)
         session.add(comment)
+        session.flush()
         session.add(CaseEventRecord(tenant_id=tenant_id, case_id=case_id, event_type="case.comment", actor=principal.subject, payload_json=json.dumps({"comment_id": comment.id})))
         session.commit(); session.refresh(comment)
     AUDIT.record("case.comment", principal, request, {"case_id": case_id, "comment_id": comment.id})
@@ -150,7 +155,7 @@ def add_comment(case_id: int, req: CommentRequest, request: Request):
 def case_timeline(case_id: int, request: Request, limit: int = 200):
     principal, tenant_id = _principal(request, "case:read")
     limit = max(1, min(limit, 1000))
-    with Session(ENGINE) as session:
+    with tenant_session(tenant_id) as session:
         case = session.scalar(select(CaseRecord).where(CaseRecord.id == case_id, CaseRecord.tenant_id == tenant_id))
         if not case: raise HTTPException(404, "Case not found")
         events = list(session.scalars(select(CaseEventRecord).where(CaseEventRecord.case_id == case_id, CaseEventRecord.tenant_id == tenant_id).order_by(CaseEventRecord.id.asc()).limit(limit)))
@@ -164,7 +169,7 @@ def case_timeline(case_id: int, request: Request, limit: int = 200):
 @router.get("/config/{name}")
 def get_config(name: str, request: Request):
     principal, tenant_id = _principal(request, "case:read")
-    with Session(ENGINE) as session:
+    with tenant_session(tenant_id) as session:
         row = session.scalar(select(TenantConfigRecord).where(TenantConfigRecord.tenant_id == tenant_id, TenantConfigRecord.name == name))
     if not row:
         raise HTTPException(404, "Configuration not found")
@@ -175,7 +180,7 @@ def get_config(name: str, request: Request):
 def put_config(name: str, req: ConfigRequest, request: Request):
     principal, tenant_id = _principal(request, "case:write")
     if len(name) > 100 or not name.replace("_", "").replace("-", "").isalnum(): raise HTTPException(400, "Invalid configuration name")
-    with Session(ENGINE) as session:
+    with tenant_session(tenant_id) as session:
         row = session.scalar(select(TenantConfigRecord).where(TenantConfigRecord.tenant_id == tenant_id, TenantConfigRecord.name == name))
         if row: row.value_json = json.dumps(req.value, sort_keys=True)
         else:
@@ -188,7 +193,7 @@ def put_config(name: str, req: ConfigRequest, request: Request):
 @router.get("/features/{name}")
 def get_feature(name: str, request: Request):
     principal, tenant_id = _principal(request, "case:read")
-    with Session(ENGINE) as session:
+    with tenant_session(tenant_id) as session:
         row = session.scalar(select(TenantConfigRecord).where(TenantConfigRecord.tenant_id == tenant_id, TenantConfigRecord.name == f"feature:{name}"))
     return {"tenant_id": tenant_id, "name": name, "enabled": bool(json.loads(row.value_json).get("enabled", False)) if row else False}
 
@@ -197,7 +202,7 @@ def get_feature(name: str, request: Request):
 def put_feature(name: str, req: FeatureRequest, request: Request):
     principal, tenant_id = _principal(request, "case:write")
     if len(name) > 100 or not name.replace("_", "").replace("-", "").isalnum(): raise HTTPException(400, "Invalid feature name")
-    with Session(ENGINE) as session:
+    with tenant_session(tenant_id) as session:
         key = f"feature:{name}"
         row = session.scalar(select(TenantConfigRecord).where(TenantConfigRecord.tenant_id == tenant_id, TenantConfigRecord.name == key))
         payload = json.dumps({"enabled": req.enabled})

@@ -12,7 +12,7 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
-from sqlalchemy import BigInteger, DateTime, Float, Integer, String, Text, create_engine, select, text
+from sqlalchemy import BigInteger, DateTime, Float, Integer, String, Text, create_engine, event, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 DATABASE_URL = os.getenv("THREATFADE_DATABASE_URL", "sqlite:///./threatfade.db")
@@ -196,12 +196,47 @@ if DATABASE_URL.startswith("sqlite"):
     Base.metadata.create_all(ENGINE)
 
 
-def set_tenant_context(session: Session, tenant_id: str) -> None:
-    """Set PostgreSQL transaction-local tenant context for RLS policies."""
+def _validate_tenant_id(tenant_id: str) -> str:
     if not tenant_id or len(tenant_id) > 255:
         raise ValueError("invalid tenant_id")
-    if ENGINE.dialect.name == "postgresql":
-        session.execute(text("SELECT set_config('threatfade.tenant_id', :tenant_id, true)"), {"tenant_id": tenant_id})
+    return tenant_id
+
+
+def _apply_tenant_context(session: Session, connection) -> None:
+    """Apply the session's tenant context to the current PostgreSQL transaction."""
+    tenant_id = session.info.get("tenant_id")
+    if not tenant_id or connection.dialect.name != "postgresql":
+        return
+
+    connection.execute(
+        text("SELECT set_config('threatfade.tenant_id', :tenant_id, true)"),
+        {"tenant_id": tenant_id},
+    )
+
+
+@event.listens_for(Session, "after_begin")
+def _set_rls_tenant_context(session: Session, transaction, connection) -> None:
+    """Set transaction-local RLS context whenever a tenant-bound transaction begins."""
+    _apply_tenant_context(session, connection)
+
+
+def set_tenant_context(session: Session, tenant_id: str) -> None:
+    """Bind a SQLAlchemy session to a PostgreSQL transaction-local tenant context."""
+    tenant_id = _validate_tenant_id(tenant_id)
+    session.info["tenant_id"] = tenant_id
+
+    # Establish the context immediately if this session already has a transaction.
+    if session.in_transaction() and ENGINE.dialect.name == "postgresql":
+        connection = session.connection()
+        _apply_tenant_context(session, connection)
+
+
+def tenant_session(tenant_id: str) -> Session:
+    """Create a tenant-bound SQLAlchemy session."""
+    tenant_id = _validate_tenant_id(tenant_id)
+    session = Session(ENGINE, expire_on_commit=False)
+    session.info["tenant_id"] = tenant_id
+    return session
 
 
 def save_detection(tenant_id: str, subject: str, source: str, result: Dict[str, Any], mitre_ttp: str, *, correlation_id: str | None = None, input_sha256: str | None = None, rule_pack_sha256: str | None = None, engine_version: str | None = None, model_sha256: str | None = None, config_sha256: str | None = None) -> int:
