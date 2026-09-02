@@ -14,11 +14,9 @@ EXPECTED_ANALYST_ROUTES = {
 
 
 def test_analyst_routes_are_registered():
-    paths = {
-        route.path
-        for route in app.routes
-        if getattr(route, "path", None)
-    }
+    # FastAPI may represent included routers as internal wrapper routes in
+    # ``app.routes``. OpenAPI exposes the effective application-level paths.
+    paths = set(app.openapi().get("paths", {}))
 
     missing = EXPECTED_ANALYST_ROUTES - paths
 

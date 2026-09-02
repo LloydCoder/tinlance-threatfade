@@ -10,9 +10,14 @@ from enterprise_app import app
 
 def _seed(tenant: str) -> int:
     with Session(ENGINE) as session:
+        from core.storage import set_tenant_context
+        set_tenant_context(session, tenant)
         row = DetectionRecord(tenant_id=tenant, subject="sensor-host", source="correlation", detected=1, confidence="high", score=0.88, mitre_ttp="T1071", evidence_json='{"observed":true}', correlation_id=str(uuid.uuid4()), created_at=datetime.now(timezone.utc))
-        session.add(row); session.commit(); session.refresh(row)
-        return row.id
+        session.add(row)
+        session.flush()
+        detection_id = row.id
+        session.commit()
+        return detection_id
 
 
 def test_analyst_api_enforces_tenant_object_boundary(monkeypatch):

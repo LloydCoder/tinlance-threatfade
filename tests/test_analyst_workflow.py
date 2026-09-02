@@ -4,14 +4,29 @@ import uuid
 from sqlalchemy.orm import Session
 
 from core.analyst import create_case_for_detection, dispose, inbox, set_workflow, timeline
-from core.storage import ENGINE, DetectionRecord
+from core.storage import ENGINE, DetectionRecord, set_tenant_context
 
 
 def _seed(tenant: str) -> int:
     with Session(ENGINE) as session:
-        row = DetectionRecord(tenant_id=tenant, subject="host-1", source="test", detected=1, confidence="high", score=0.91, mitre_ttp="T1071", evidence_json='{"signal":"fade"}', correlation_id=str(uuid.uuid4()), created_at=datetime.now(timezone.utc))
-        session.add(row); session.commit(); session.refresh(row)
-        return row.id
+        set_tenant_context(session, tenant)
+        row = DetectionRecord(
+            tenant_id=tenant,
+            subject="host-1",
+            source="test",
+            detected=1,
+            confidence="high",
+            score=0.91,
+            mitre_ttp="T1071",
+            evidence_json='{"signal":"fade"}',
+            correlation_id=str(uuid.uuid4()),
+            created_at=datetime.now(timezone.utc),
+        )
+        session.add(row)
+        session.flush()
+        detection_id = row.id
+        session.commit()
+        return detection_id
 
 
 def test_detection_workflow_is_tenant_scoped():

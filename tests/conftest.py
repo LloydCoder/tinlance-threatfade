@@ -131,6 +131,9 @@ def pytest_sessionstart(session: pytest.Session) -> None:
     url, target = configured
     name = target.database
     assert name is not None
+    owner = target.username
+    if not owner:
+        pytest.exit("TEST_DATABASE_URL must include a PostgreSQL username.")
     maintenance_url = _maintenance_url(target)
 
     original_database_url = os.environ.get("THREATFADE_DATABASE_URL")
@@ -147,7 +150,7 @@ def pytest_sessionstart(session: pytest.Session) -> None:
         if _database_exists(maintenance, name):
             _terminate_and_drop(maintenance, name)
         with maintenance.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-            conn.execute(text("CREATE DATABASE \"" + name.replace('"', '""') + "\""))
+            conn.execute(text("CREATE DATABASE \"" + name.replace('"', '""') + "\" OWNER \"" + owner.replace('"', '""') + "\""))
     except Exception:
         try:
             _dispose_test_database(target, maintenance_url)

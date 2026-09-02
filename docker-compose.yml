@@ -32,7 +32,7 @@ services:
         condition: service_completed_successfully
     environment:
       THREATFADE_ENV: production
-      THREATFADE_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-threatfade}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-threatfade}
+      THREATFADE_DATABASE_URL: postgresql+psycopg://${THREATFADE_APP_DB_USER}:${THREATFADE_APP_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-threatfade}
       THREATFADE_OIDC_ISSUER: ${THREATFADE_OIDC_ISSUER:?set THREATFADE_OIDC_ISSUER}
       THREATFADE_OIDC_AUDIENCE: ${THREATFADE_OIDC_AUDIENCE:?set THREATFADE_OIDC_AUDIENCE}
       THREATFADE_OIDC_JWKS_URL: ${THREATFADE_OIDC_JWKS_URL:-}

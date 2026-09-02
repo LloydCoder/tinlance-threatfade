@@ -22,3 +22,8 @@ backups/*
 *.manifest.json
 *.sigstore.json
 *.sarif
+
+# Never bake deployment secrets into images
+.env
+.env.*
+!.env.example

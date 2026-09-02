@@ -1,5 +1,14 @@
 """Fail-fast verification of the production application route composition."""
 
+import sys
+from pathlib import Path
+
+# Allow this script to be executed directly from the repository root or from
+# inside the Docker image without relying on the caller's PYTHONPATH.
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from enterprise_app import app
 
 
@@ -14,11 +23,9 @@ EXPECTED_ANALYST_ROUTES = {
     "/enterprise/analyst/detections/{detection_id}/sessions",
 }
 
-paths = {
-    route.path
-    for route in app.routes
-    if getattr(route, "path", None)
-}
+# FastAPI may represent included routers as internal wrapper routes in
+# ``app.routes``. OpenAPI exposes the effective application-level paths.
+paths = set(app.openapi().get("paths", {}))
 
 missing = EXPECTED_ANALYST_ROUTES - paths
 

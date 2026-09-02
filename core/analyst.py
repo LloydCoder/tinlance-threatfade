@@ -13,7 +13,15 @@ from typing import Any
 from sqlalchemy import Integer, String, Text, DateTime, select, func
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
-from core.storage import Base, ENGINE, DetectionRecord, EvidenceRecord, CaseRecord, CaseEventRecord
+from core.storage import (
+    Base,
+    ENGINE,
+    DetectionRecord,
+    EvidenceRecord,
+    CaseRecord,
+    CaseEventRecord,
+    set_tenant_context,
+)
 
 
 class DetectionWorkflowRecord(Base):
@@ -93,8 +101,15 @@ def _json(value: str | None) -> dict[str, Any]:
         return {}
 
 
+def _session(tenant_id: str) -> Session:
+    """Create a tenant-bound session with PostgreSQL RLS context."""
+    session = Session(ENGINE, expire_on_commit=False)
+    set_tenant_context(session, tenant_id)
+    return session
+
+
 def detection(tenant_id: str, detection_id: int) -> DetectionRecord | None:
-    with Session(ENGINE) as s:
+    with _session(tenant_id) as s:
         return s.scalar(select(DetectionRecord).where(DetectionRecord.id == detection_id, DetectionRecord.tenant_id == tenant_id))
 
 
@@ -103,7 +118,7 @@ def inbox(tenant_id: str, *, limit: int = 100, offset: int = 0, status: str | No
     if status is not None and status not in WORKFLOW_STATUSES: raise ValueError("invalid workflow status")
     if sort not in SORT_FIELDS: raise ValueError("invalid sort field")
     if order.lower() not in {"asc", "desc"}: raise ValueError("invalid sort order")
-    with Session(ENGINE) as s:
+    with _session(tenant_id) as s:
         q = select(DetectionRecord, DetectionWorkflowRecord).outerjoin(DetectionWorkflowRecord, (DetectionWorkflowRecord.detection_id == DetectionRecord.id) & (DetectionWorkflowRecord.tenant_id == tenant_id)).where(DetectionRecord.tenant_id == tenant_id, DetectionRecord.detected == 1)
         if status: q = q.where(DetectionWorkflowRecord.status == status)
         if assignee: q = q.where(DetectionWorkflowRecord.assignee == assignee)
@@ -113,7 +128,7 @@ def inbox(tenant_id: str, *, limit: int = 100, offset: int = 0, status: str | No
 
 
 def inbox_total(tenant_id: str, *, status: str | None = None, assignee: str | None = None) -> int:
-    with Session(ENGINE) as s:
+    with _session(tenant_id) as s:
         q = select(func.count(DetectionRecord.id)).where(DetectionRecord.tenant_id == tenant_id, DetectionRecord.detected == 1)
         if status is not None or assignee is not None:
             q = q.join(DetectionWorkflowRecord, (DetectionWorkflowRecord.detection_id == DetectionRecord.id) & (DetectionWorkflowRecord.tenant_id == tenant_id))
@@ -126,7 +141,7 @@ def set_workflow(tenant_id: str, detection_id: int, actor: str, *, status: str |
     if status is not None and status not in WORKFLOW_STATUSES: raise ValueError("invalid workflow status")
     if priority is not None and not 0 <= priority <= 100: raise ValueError("priority must be 0..100")
     if assignee is not None and len(assignee) > 255: raise ValueError("assignee too long")
-    with Session(ENGINE) as s:
+    with _session(tenant_id) as s:
         d = s.scalar(select(DetectionRecord).where(DetectionRecord.id == detection_id, DetectionRecord.tenant_id == tenant_id))
         if not d: return None
         row = s.scalar(select(DetectionWorkflowRecord).where(DetectionWorkflowRecord.detection_id == detection_id, DetectionWorkflowRecord.tenant_id == tenant_id))
@@ -137,25 +152,25 @@ def set_workflow(tenant_id: str, detection_id: int, actor: str, *, status: str |
         if priority is not None: row.priority = priority
         row.updated_by, row.updated_at = actor, _now()
         s.add(CaseEventRecord(tenant_id=tenant_id, case_id=None, event_type="detection.workflow", actor=actor, payload_json=json.dumps({"detection_id": detection_id, "status": row.status, "assignee": row.assignee, "priority": row.priority})))
-        s.commit(); s.refresh(row); return row
+        s.flush(); s.commit(); return row
 
 
 def create_case_for_detection(tenant_id: str, detection_id: int, actor: str, title: str):
     if not title or len(title) > 500: raise ValueError("invalid case title")
-    with Session(ENGINE) as s:
+    with _session(tenant_id) as s:
         d = s.scalar(select(DetectionRecord).where(DetectionRecord.id == detection_id, DetectionRecord.tenant_id == tenant_id))
         if not d: return None
         case = CaseRecord(tenant_id=tenant_id, owner=actor, title=title.strip(), status="investigating")
         s.add(case); s.flush()
         s.add(CaseDetectionLinkRecord(tenant_id=tenant_id, case_id=case.id, detection_id=detection_id, created_by=actor, created_at=_now()))
         s.add(CaseEventRecord(tenant_id=tenant_id, case_id=case.id, event_type="detection.linked", actor=actor, payload_json=json.dumps({"detection_id": detection_id})))
-        s.commit(); s.refresh(case); return case
+        s.flush(); s.commit(); return case
 
 
 def dispose(tenant_id: str, detection_id: int, actor: str, reason: str, note: str = "", case_id: int | None = None):
     if reason not in DISPOSITION_REASONS: raise ValueError("invalid disposition reason")
     if len(note) > 4000: raise ValueError("note too long")
-    with Session(ENGINE) as s:
+    with _session(tenant_id) as s:
         d = s.scalar(select(DetectionRecord).where(DetectionRecord.id == detection_id, DetectionRecord.tenant_id == tenant_id))
         if not d: return None
         if case_id is not None and not s.scalar(select(CaseRecord).where(CaseRecord.id == case_id, CaseRecord.tenant_id == tenant_id)): return None
@@ -165,11 +180,11 @@ def dispose(tenant_id: str, detection_id: int, actor: str, reason: str, note: st
             workflow = DetectionWorkflowRecord(tenant_id=tenant_id, detection_id=detection_id, status="resolved", updated_by=actor, updated_at=_now()); s.add(workflow)
         workflow.status = "resolved" if reason != "needs_tuning" else "investigating"; workflow.updated_by, workflow.updated_at = actor, _now()
         s.add(CaseEventRecord(tenant_id=tenant_id, case_id=case_id, event_type="detection.disposition", actor=actor, payload_json=json.dumps({"detection_id": detection_id, "reason": reason, "case_id": case_id})))
-        s.commit(); s.refresh(row); return row
+        s.flush(); s.commit(); return row
 
 
 def investigation(tenant_id: str, detection_id: int) -> dict[str, Any] | None:
-    with Session(ENGINE) as s:
+    with _session(tenant_id) as s:
         d = s.scalar(select(DetectionRecord).where(DetectionRecord.id == detection_id, DetectionRecord.tenant_id == tenant_id))
         if not d: return None
         workflow = s.scalar(select(DetectionWorkflowRecord).where(DetectionWorkflowRecord.detection_id == detection_id, DetectionWorkflowRecord.tenant_id == tenant_id))
@@ -185,7 +200,7 @@ def investigation(tenant_id: str, detection_id: int) -> dict[str, Any] | None:
 
 def timeline(tenant_id: str, detection_id: int, limit: int = 200):
     limit = max(1, min(limit, 500))
-    with Session(ENGINE) as s:
+    with _session(tenant_id) as s:
         d = s.scalar(select(DetectionRecord).where(DetectionRecord.id == detection_id, DetectionRecord.tenant_id == tenant_id))
         if not d: return None
         events = list(s.scalars(select(CaseEventRecord).where(CaseEventRecord.tenant_id == tenant_id).order_by(CaseEventRecord.created_at.asc()).limit(limit)))

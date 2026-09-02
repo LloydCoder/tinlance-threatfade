@@ -1,0 +1,12 @@
+services:
+  threatfade-test:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      THREATFADE_ENV: production
+      THREATFADE_DATABASE_URL: postgresql+psycopg://${THREATFADE_APP_DB_USER}:${THREATFADE_APP_DB_PASSWORD}@postgres:5432/threatfade
+      TEST_DATABASE_URL: postgresql+psycopg://${THREATFADE_APP_DB_USER}:${THREATFADE_APP_DB_PASSWORD}@postgres:5432/threatfade_test
+      TEST_DATABASE_ADMIN_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/postgres
+    command: ["pytest", "-q"]
