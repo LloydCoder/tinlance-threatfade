@@ -80,7 +80,14 @@ def authenticate(request: Request, api_key: Optional[str] = None) -> Principal:
             from core.identity import validate_session
             if validate_session(session_token, principal.subject) is None: raise HTTPException(401, "Authentication session is no longer valid")
         from core.identity import ensure_user
-        ensure_user(principal.subject, principal.claims.get("email"), principal.claims.get("name") or principal.claims.get("preferred_username")); return principal
+        user = ensure_user(
+            principal.subject,
+            principal.claims.get("email"),
+            principal.claims.get("name") or principal.claims.get("preferred_username"),
+        )
+        if user.disabled:
+            raise HTTPException(401, "Authentication account is disabled")
+        return principal
     if os.getenv("THREATFADE_ENV", "development").lower() != "production":
         configured = os.getenv("THREATFADE_API_KEY")
         if configured and api_key == configured:

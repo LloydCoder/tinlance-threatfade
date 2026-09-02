@@ -257,3 +257,71 @@ def test_tenant_session_reapplies_rls_context_after_commit():
             select(CaseRecord).where(CaseRecord.tenant_id == tenant_b)
         )
         assert guessed is None
+
+
+def test_oidc_authentication_rejects_disabled_local_account(monkeypatch):
+    from types import SimpleNamespace
+
+    principal = Principal(
+        "disabled-user",
+        "tenant-a",
+        {"analyst"},
+        claims={"email": "disabled@example.test"},
+    )
+
+    monkeypatch.setattr(
+        "core.enterprise.OIDC.validate",
+        lambda token: principal,
+    )
+    monkeypatch.setattr(
+        "core.identity.ensure_user",
+        lambda subject, email=None, name=None: SimpleNamespace(
+            subject=subject,
+            disabled=1,
+        ),
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        authenticate(
+            _request(
+                {
+                    "Authorization": "Bearer valid-oidc-token",
+                }
+            )
+        )
+
+    assert exc.value.status_code == 401
+    assert exc.value.detail == "Authentication account is disabled"
+
+
+def test_oidc_authentication_accepts_active_local_account(monkeypatch):
+    from types import SimpleNamespace
+
+    principal = Principal(
+        "active-user",
+        "tenant-a",
+        {"analyst"},
+        claims={"email": "active@example.test"},
+    )
+
+    monkeypatch.setattr(
+        "core.enterprise.OIDC.validate",
+        lambda token: principal,
+    )
+    monkeypatch.setattr(
+        "core.identity.ensure_user",
+        lambda subject, email=None, name=None: SimpleNamespace(
+            subject=subject,
+            disabled=0,
+        ),
+    )
+
+    result = authenticate(
+        _request(
+            {
+                "Authorization": "Bearer valid-oidc-token",
+            }
+        )
+    )
+
+    assert result is principal
