@@ -26,7 +26,7 @@ class InvitationRecord(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True); organization_id: Mapped[str] = mapped_column(String(32), index=True, nullable=False); email: Mapped[str] = mapped_column(String(320), index=True, nullable=False); role: Mapped[str] = mapped_column(String(16), nullable=False); token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False); invited_by: Mapped[str] = mapped_column(String(255), nullable=False); expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False); accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True); revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True); created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 class AuthSessionRecord(Base):
     __tablename__ = "identity_sessions"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True); token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False); subject: Mapped[str] = mapped_column(String(255), index=True, nullable=False); active_organization_id: Mapped[str | None] = mapped_column(String(32), nullable=True); created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False); last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False); expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False); revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True); user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True); source_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True); token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False); subject: Mapped[str] = mapped_column(String(255), index=True, nullable=False); session_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1); active_organization_id: Mapped[str | None] = mapped_column(String(32), nullable=True); created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False); last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False); expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False); revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True); user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True); source_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
 if ENGINE.dialect.name == "sqlite": Base.metadata.create_all(ENGINE)
 def _now() -> datetime: return datetime.now(timezone.utc)
 def _utc(value: datetime | None) -> datetime | None:
@@ -86,7 +86,13 @@ def invite_member(subject: str, organization_id: str, email: str, role: str) -> 
 def accept_invitation(subject: str, token: str, email: str | None) -> str:
     if not token or len(token) > 256: raise ValueError("invalid invitation")
     with Session(ENGINE) as session:
-        invitation = session.scalar(select(InvitationRecord).where(InvitationRecord.token_hash == _hash(token))); now = _now(); expires_at = _utc(invitation.expires_at) if invitation is not None else None
+        invitation = session.scalar(
+            select(InvitationRecord)
+            .where(InvitationRecord.token_hash == _hash(token))
+            .with_for_update()
+        )
+        now = _now()
+        expires_at = _utc(invitation.expires_at) if invitation is not None else None
         if invitation is None or invitation.accepted_at or invitation.revoked_at or expires_at is None or expires_at <= now: raise ValueError("invalid or expired invitation")
         if not email or email.strip().lower() != invitation.email: raise PermissionError("invitation email does not match authenticated account")
         existing = session.scalar(select(MembershipRecord).where(MembershipRecord.organization_id == invitation.organization_id, MembershipRecord.subject == subject))
@@ -117,18 +123,63 @@ def remove_member(actor: str, organization_id: str, target_subject: str) -> None
         if target.role == "owner": raise PermissionError("organization owner cannot be removed")
         if actor_member.role == "admin" and target.role == "admin": raise PermissionError("only the organization owner can remove an admin")
         session.delete(target); session.commit()
-def register_session(subject: str, active_organization_id: str | None, user_agent: str | None, source_ip: str | None, ttl_seconds: int = 28800) -> str:
-    ttl_seconds = max(900, min(ttl_seconds, 43200)); user = ensure_user(subject)
-    if user.disabled: raise PermissionError("account is disabled")
-    if active_organization_id and membership(subject, active_organization_id) is None: raise PermissionError("organization access denied")
-    token = secrets.token_urlsafe(32); now = _now()
-    with Session(ENGINE) as session: session.add(AuthSessionRecord(token_hash=_hash(token), subject=subject, active_organization_id=active_organization_id, created_at=now, last_seen_at=now, expires_at=now + timedelta(seconds=ttl_seconds), user_agent=(user_agent or "")[:512] or None, source_ip=(source_ip or "")[:64] or None)); session.commit()
+def register_session(
+    subject: str,
+    active_organization_id: str | None,
+    user_agent: str | None,
+    source_ip: str | None,
+    ttl_seconds: int = 28800,
+) -> str:
+    ttl_seconds = max(900, min(ttl_seconds, 43200))
+    ensure_user(subject)
+
+    token = secrets.token_urlsafe(32)
+    now = _now()
+
+    with Session(ENGINE) as session:
+        user = session.scalar(
+            select(UserRecord)
+            .where(UserRecord.subject == subject)
+            .with_for_update()
+        )
+        if user is None:
+            raise PermissionError("account not found")
+        if user.disabled:
+            raise PermissionError("account is disabled")
+
+        if active_organization_id:
+            member = session.scalar(
+                select(MembershipRecord).where(
+                    MembershipRecord.organization_id == active_organization_id,
+                    MembershipRecord.subject == subject,
+                )
+            )
+            if member is None:
+                raise PermissionError("organization access denied")
+
+        session.add(
+            AuthSessionRecord(
+                token_hash=_hash(token),
+                subject=subject,
+                session_version=user.session_version,
+                active_organization_id=active_organization_id,
+                created_at=now,
+                last_seen_at=now,
+                expires_at=now + timedelta(seconds=ttl_seconds),
+                user_agent=(user_agent or "")[:512] or None,
+                source_ip=(source_ip or "")[:64] or None,
+            )
+        )
+        session.commit()
+
     return token
+
+
 def validate_session(token: str, subject: str) -> AuthSessionRecord | None:
     if not token or len(token) > 256: return None
     with Session(ENGINE) as session:
         row = session.scalar(select(AuthSessionRecord).where(AuthSessionRecord.token_hash == _hash(token), AuthSessionRecord.subject == subject)); now = _now(); user = session.scalar(select(UserRecord).where(UserRecord.subject == subject)); expires_at = _utc(row.expires_at) if row is not None else None
-        if row is None or row.revoked_at is not None or expires_at is None or expires_at <= now or user is None or user.disabled: return None
+        if row is None or row.revoked_at is not None or expires_at is None or expires_at <= now or user is None or user.disabled or row.session_version != user.session_version: return None
         row.last_seen_at = now; session.commit(); session.refresh(row); row.expires_at = _utc(row.expires_at); session.expunge(row); return row
 def list_sessions(subject: str) -> list[dict[str, object]]:
     with Session(ENGINE) as session:

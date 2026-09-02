@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import pytest
 from fastapi import HTTPException
 from core.enterprise import Principal, require_tenant
-from core.identity import create_organization, ensure_user, invite_member, membership, accept_invitation, register_session, validate_session, revoke_session, change_member_role, list_members
+from core.identity import create_organization, ensure_user, invite_member, membership, accept_invitation, register_session, validate_session, revoke_session, revoke_all_sessions, change_member_role, list_members
 
 def test_owner_admin_analyst_viewer_rbac_and_cross_tenant_isolation():
     owner = ensure_user("owner-phase13", "owner@example.test", "Owner")
@@ -66,3 +66,44 @@ def test_session_expiry_is_enforced():
     row = validate_session(session_token, user.subject)
     assert row is not None
     assert row.expires_at > datetime.now(timezone.utc)
+
+
+def test_revoke_all_sessions_invalidates_existing_session_by_version():
+    user = ensure_user("session-version-phase13", "session-version@example.test")
+    session_token = register_session(user.subject, None, "pytest", "127.0.0.1")
+
+    assert validate_session(session_token, user.subject) is not None
+
+    revoke_all_sessions(user.subject)
+
+    assert validate_session(session_token, user.subject) is None
+
+
+def test_new_session_uses_current_session_version_after_global_revoke():
+    user = ensure_user("session-version-new-phase13", "session-version-new@example.test")
+    old_token = register_session(user.subject, None, "pytest", "127.0.0.1")
+
+    revoke_all_sessions(user.subject)
+
+    new_token = register_session(user.subject, None, "pytest", "127.0.0.1")
+
+    assert old_token != new_token
+    assert validate_session(old_token, user.subject) is None
+    assert validate_session(new_token, user.subject) is not None
+
+
+def test_invitation_acceptance_locks_invitation_row():
+    owner = ensure_user("invite-lock-owner-phase13", "invite-lock-owner@example.test")
+    invited = ensure_user("invite-lock-user-phase13", "invite-lock-user@example.test")
+    org = create_organization(
+        owner.subject,
+        "Invitation Lock Security",
+        "invitation-lock-phase13",
+    )
+
+    token = invite_member(owner.subject, org.id, invited.email, "viewer")
+
+    assert accept_invitation(invited.subject, token, invited.email) == org.id
+
+    with pytest.raises(ValueError):
+        accept_invitation(invited.subject, token, invited.email)
