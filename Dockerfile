@@ -16,12 +16,19 @@ LABEL org.opencontainers.image.source="https://github.com/LloydCoder/tinlance-th
 RUN addgroup --system threatfade && adduser --system --ingroup threatfade threatfade
 WORKDIR /app
 
-# Refresh Debian security packages to currently fixed Trixie versions.
+# Refresh Debian Trixie security packages to versions fixed by the current
+# vulnerability database. Exact versions keep the build reproducible.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+       libc-bin=2.41-12+deb13u4 \
+       libc6=2.41-12+deb13u4 \
+       gzip=1.13-1+deb13u1 \
+       libpcre2-8-0=10.46-1~deb13u2 \
+       libsqlite3-0=3.46.1-7+deb13u2 \
        libssl3t64=3.5.7-1~deb13u2 \
        openssl=3.5.7-1~deb13u2 \
        openssl-provider-legacy=3.5.7-1~deb13u2 \
+       perl-base=5.40.1-6+deb13u1 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
