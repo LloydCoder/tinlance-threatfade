@@ -72,22 +72,45 @@ ThreatFade treats detection integrity and provenance as security properties. Evi
 
 Cryptographic integrity controls, signed batches, replay protection, and offline evidence packaging are documented in the repository's evidence/integrity implementation. A log entry is not treated as equivalent to a cryptographic signature or hash chain.
 
-## 6. Offline and store-and-forward boundary
+## 6. Offline and store-and-forward security
 
 The repository implements bounded durable store-and-forward and signed/replay-safe delivery paths. Offline operation is therefore bounded, not unlimited: capacity, retry, retention, and deployment durability depend on the configured storage/queue environment. Optional enrichment may degrade without disabling core detection, but degradation must remain observable.
 
-## 7. Input and resource security
+## 7. Security invariants
 
-PCAP/PCAPNG, network signals, detection packs, model artifacts, and integration payloads are treated as untrusted or security-sensitive inputs. The architecture requires schema validation, bounded parsing/processing, path safety, timeouts, rate limits, and explicit resource bounds. Uploaded capture content is data, not executable content.
+- **SI-01 Authentication boundary:** production protected operations require a valid configured identity boundary; missing or invalid identity configuration fails closed.
+- **SI-02 Tenant authority:** client-controlled tenant identifiers cannot grant authority over another tenant.
+- **SI-03 Privilege separation:** platform-wide privileges are distinct from tenant-scoped privileges and require explicit role assignment.
+- **SI-04 Untrusted file handling:** uploaded PCAP/PCAPNG content is data, never executable content; arbitrary client filenames are not trusted as filesystem paths.
+- **SI-05 Evidence integrity:** detections retain sufficient provenance to reproduce their source, rule/version, engine version, configuration and evidence boundary.
+- **SI-06 Audit integrity:** security-sensitive actions generate structured audit events; durable tamper-evident centralized retention is a deployment responsibility.
+- **SI-07 Fail closed:** authentication, authorization and tenant-isolation boundaries fail closed.
+- **SI-08 Bounded processing:** externally controllable resource-intensive operations have explicit size/count/time/memory/concurrency/rate bounds.
+- **SI-09 Supply-chain integrity:** release artifacts are traceable to source with SBOM/provenance/signing controls.
+- **SI-10 Secrets non-disclosure:** credentials, tokens, raw PCAP payloads and restricted evidence are not emitted to public telemetry or application logs.
 
-## 8. Supply-chain security
+## 8. Input and resource security
 
-The repository contains dependency/security scanning, SBOM, provenance/attestation, artifact signing, container hardening, and release verification gates. These are implemented engineering controls; they are not evidence of a third-party security certification.
+PCAP/PCAPNG, network signals, detection packs, model artifacts and integration payloads are treated as untrusted or security-sensitive inputs. The implementation and deployment model use schema validation, bounded parsing/processing, path safety, timeouts, rate limits, request IDs, CORS/security-header controls and explicit resource limits. Uploaded capture content is data, not executable content.
 
-## 9. Deployment responsibilities
+## 9. Supply-chain security
 
-ThreatFade's deployment architecture separates application controls from operator responsibilities. Operators remain responsible for TLS/edge controls, secret management, PostgreSQL encryption/HA/backups, immutable evidence/audit retention, network segmentation, egress policy, runtime resource limits, and identity-provider configuration.
+The repository contains dependency/security scanning, SBOM generation, provenance/attestation, artifact signing, container hardening and release verification gates. These are implemented engineering controls; they are not evidence of a third-party security certification.
 
-## 10. Assurance boundary
+## 10. High-risk design decisions
 
-This architecture is an engineering baseline. It does **not** represent SOC 2, ISO 27001, Common Criteria, regulatory approval, third-party penetration testing, independent detection validation, or customer-scale assurance. Those require separate evidence.
+| Decision | Rationale | Residual risk |
+|---|---|---|
+| PostgreSQL is the production reference store | Durable relational tenancy and investigation state | HA, backup, encryption and operational RLS remain deployment responsibilities until independently verified in the target environment |
+| PCAP parsing is a security boundary | Network captures are attacker-controlled data | The synchronous reference path still requires deployment-level workload isolation for stronger sandboxing |
+| OIDC is externalized | Enterprise identity belongs at the customer's trust boundary | Provider configuration remains an operational risk |
+| Detection packs are versioned | Detection behavior must be reproducible | Full signing/registry/canary lifecycle remains a follow-on control area |
+| Optional telemetry is not required for core detection | Detection should not depend on an observability provider | Production telemetry policy remains operator-controlled |
+
+## 11. Deployment responsibilities
+
+ThreatFade's deployment architecture separates application controls from operator responsibilities. Operators remain responsible for TLS/edge controls, secret management, PostgreSQL encryption/HA/backups, immutable evidence/audit retention, network segmentation, egress policy, runtime resource limits and identity-provider configuration.
+
+## 12. Assurance boundary
+
+This architecture is an engineering baseline. It does **not** represent SOC 2, ISO 27001, Common Criteria, regulatory approval, third-party penetration testing, independent detection validation, contractual SLAs or customer-scale assurance. Those require separate operational and independent evidence.
