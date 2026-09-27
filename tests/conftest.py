@@ -1,7 +1,3 @@
-import os
-
-os.environ.setdefault("THREATFADE_INTEGRATION_ALLOW_LOOPBACK", "true")
-
 """Safe, disposable database isolation for PostgreSQL-backed test runs.
 
 When a PostgreSQL test URL is explicitly supplied, pytest creates a disposable
@@ -20,6 +16,10 @@ repository's normal local SQLite behavior; this is required for lightweight
 unit/governance workflows that do not provision PostgreSQL.
 """
 from __future__ import annotations
+
+import os
+
+os.environ.setdefault("THREATFADE_INTEGRATION_ALLOW_LOOPBACK", "true")
 
 import os
 import subprocess
