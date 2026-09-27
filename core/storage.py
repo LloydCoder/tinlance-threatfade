@@ -40,11 +40,11 @@ class DetectionRecord(Base):
     mitre_ttp: Mapped[str] = mapped_column(String(255), nullable=False)
     evidence_json: Mapped[str] = mapped_column(Text, nullable=False)
     correlation_id: Mapped[str | None] = mapped_column(String(128), index=True, nullable=True)
-    input_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    rule_pack_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    engine_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    input_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    rule_pack_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    engine_version: Mapped[str] = mapped_column(String(64), nullable=False)
     model_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    config_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    config_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
@@ -204,7 +204,33 @@ def set_tenant_context(session: Session, tenant_id: str) -> None:
         session.execute(text("SELECT set_config('threatfade.tenant_id', :tenant_id, true)"), {"tenant_id": tenant_id})
 
 
-def save_detection(tenant_id: str, subject: str, source: str, result: Dict[str, Any], mitre_ttp: str, *, correlation_id: str | None = None, input_sha256: str | None = None, rule_pack_sha256: str | None = None, engine_version: str | None = None, model_sha256: str | None = None, config_sha256: str | None = None) -> int:
+def save_detection(
+    tenant_id: str,
+    subject: str,
+    source: str,
+    result: Dict[str, Any],
+    mitre_ttp: str,
+    *,
+    correlation_id: str,
+    input_sha256: str,
+    rule_pack_sha256: str,
+    engine_version: str,
+    config_sha256: str,
+    model_sha256: str | None = None,
+) -> int:
+    """Persist a detection only when its complete provenance contract is present."""
+    import re
+    if not correlation_id or not isinstance(correlation_id, str) or len(correlation_id) > 128:
+        raise ValueError("correlation_id is required")
+    for field_name, value in {
+        "input_sha256": input_sha256,
+        "rule_pack_sha256": rule_pack_sha256,
+        "config_sha256": config_sha256,
+    }.items():
+        if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
+            raise ValueError(f"{field_name} must be a lowercase SHA-256 digest")
+    if not engine_version or not isinstance(engine_version, str) or len(engine_version) > 64:
+        raise ValueError("engine_version is required")
     with Session(ENGINE) as session:
         set_tenant_context(session, tenant_id)
         record = DetectionRecord(
