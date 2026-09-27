@@ -6,7 +6,7 @@ import json
 import time
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from .integrity import GENESIS_HASH, audit_event_hash, verify_hash_chain
@@ -17,7 +17,7 @@ def append_event(*, tenant_id: str, actor: str, action: str, object_type: str, o
     now = datetime.now(timezone.utc)
     with Session(ENGINE) as session:
         set_tenant_context(session, tenant_id)
-        previous = session.scalar(select(AuditEventRecord).where(AuditEventRecord.tenant_id == tenant_id).order_by(AuditEventRecord.sequence_no.desc()).limit(1))
+        # Serialize append operations per tenant so two writers cannot fork the hash chain.\n        if ENGINE.dialect.name == "postgresql":\n            session.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:tenant_id, 0))"), {"tenant_id": tenant_id})\n        previous = session.scalar(select(AuditEventRecord).where(AuditEventRecord.tenant_id == tenant_id).order_by(AuditEventRecord.sequence_no.desc()).limit(1))
         sequence = time.time_ns()
         while previous is not None and sequence <= previous.sequence_no:
             sequence += 1
