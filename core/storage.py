@@ -45,6 +45,7 @@ class DetectionRecord(Base):
     engine_version: Mapped[str] = mapped_column(String(64), nullable=False)
     model_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     config_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    provenance_state: Mapped[str] = mapped_column(String(32), nullable=False, default="complete")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
