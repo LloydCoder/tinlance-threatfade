@@ -28,6 +28,13 @@ class Base(DeclarativeBase):
     pass
 
 
+class RateLimitBucketRecord(Base):
+    __tablename__ = "rate_limit_buckets"
+    bucket_key: Mapped[str] = mapped_column(String(128), primary_key=True)
+    window_start: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    request_count: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
 class DetectionRecord(Base):
     __tablename__ = "detections"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
