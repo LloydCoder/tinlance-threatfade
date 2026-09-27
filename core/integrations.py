@@ -13,6 +13,8 @@ from typing import Any, Callable, Mapping, Protocol
 
 import requests
 
+from core.egress import validate_integration_endpoint
+
 
 class DeliveryState(str, Enum):
     DELIVERED = "delivered"
@@ -241,6 +243,7 @@ class IntegrationConfig:
     def __post_init__(self) -> None:
         if self.name not in ADAPTERS: raise ValueError(f"unsupported integration: {self.name}")
         if not self.endpoint.startswith(("https://", "http://")): raise ValueError("endpoint must be an explicit HTTP(S) URL")
+        validate_integration_endpoint(self.endpoint)
         if self.timeout_seconds <= 0 or self.timeout_seconds > 120: raise ValueError("timeout_seconds must be >0 and <=120")
         if not self.verify_tls and self.endpoint.startswith("https://"): raise ValueError("TLS verification cannot be disabled for HTTPS integrations")
 
@@ -259,6 +262,7 @@ class IntegrationTransport:
         if credential.scheme in {"hmac-sha256", "basic"}: return {}
         raise ValueError("invalid credential configuration")
     def deliver(self, event: IntegrationEvent, config: IntegrationConfig) -> DeliveryResult:
+        validate_integration_endpoint(config.endpoint)
         started = time.monotonic()
         if event.idempotency_key in self._delivered:
             result = DeliveryResult(config.name, event.event_id, DeliveryState.DUPLICATE, 0, latency_ms=(time.monotonic()-started)*1000); self.audit.record(result); return result

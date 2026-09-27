@@ -18,6 +18,10 @@ unit/governance workflows that do not provision PostgreSQL.
 from __future__ import annotations
 
 import os
+
+os.environ.setdefault("THREATFADE_INTEGRATION_ALLOW_LOOPBACK", "true")
+
+import os
 import subprocess
 import sys
 from pathlib import Path

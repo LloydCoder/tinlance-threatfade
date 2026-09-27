@@ -111,8 +111,13 @@ def require_tenant(principal: Principal, tenant_id: Optional[str]) -> str:
     if not principal.is_global_admin: raise HTTPException(403, "Tenant access denied")
     return requested
 class AuditLogger:
+    """Legacy operational-event logger; the database hash-chain is authoritative security audit.
+
+    This file is intentionally named as an operational log to prevent consumers from
+    treating it as the tamper-evident audit ledger.
+    """
     def __init__(self, path: Optional[str] = None):
-        self.path = path or os.getenv("THREATFADE_AUDIT_PATH", "reports/audit/audit.jsonl"); directory = os.path.dirname(self.path)
+        self.path = path or os.getenv("THREATFADE_OPERATIONAL_LOG_PATH", "reports/logs/operational.jsonl"); directory = os.path.dirname(self.path)
         if directory: os.makedirs(directory, exist_ok=True)
     def record(self, action, principal: Principal, request: Optional[Request] = None, metadata: Optional[Dict[str, Any]] = None):
         client_ip = request.client.host if request and request.client else None
@@ -121,5 +126,5 @@ class AuditLogger:
         except ValueError: client_ip = None
         event = {"event_id": str(uuid.uuid4()), "timestamp": datetime.now(timezone.utc).isoformat(), "action": action, "subject": principal.subject, "tenant_id": principal.tenant_id, "roles": sorted(principal.roles), "request_id": request.headers.get("X-Request-ID") if request else None, "source_ip": client_ip, "auth_method": principal.auth_method, "metadata": metadata or {}}
         with open(self.path, "a", encoding="utf-8") as handle: handle.write(json.dumps(event, sort_keys=True) + "\n")
-AUDIT = AuditLogger()
+AUDIT = AuditLogger()  # operational telemetry only; use core.audit.append_event for security audit
 def slo_targets(): return {"api_availability": os.getenv("THREATFADE_SLO_API_AVAILABILITY", "99.9%"), "p95_detection_latency": os.getenv("THREATFADE_SLO_P95_DETECTION_LATENCY", "<2s"), "p99_detection_latency": os.getenv("THREATFADE_SLO_P99_DETECTION_LATENCY", "<5s"), "recovery_time_objective": os.getenv("THREATFADE_SLO_RTO", "<60m"), "recovery_point_objective": os.getenv("THREATFADE_SLO_RPO", "<15m")}

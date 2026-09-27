@@ -12,7 +12,7 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
-from sqlalchemy import BigInteger, DateTime, Float, Integer, String, Text, create_engine, select, text
+from sqlalchemy import BigInteger, DateTime, Float, Index, Integer, String, Text, create_engine, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 DATABASE_URL = os.getenv("THREATFADE_DATABASE_URL", "sqlite:///./threatfade.db")
@@ -28,6 +28,14 @@ class Base(DeclarativeBase):
     pass
 
 
+class RateLimitBucketRecord(Base):
+    __tablename__ = "rate_limit_buckets"
+    __table_args__ = (Index("ix_rate_limit_buckets_window_start", "window_start"),)
+    bucket_key: Mapped[str] = mapped_column(String(128), primary_key=True)
+    window_start: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    request_count: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
 class DetectionRecord(Base):
     __tablename__ = "detections"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -39,12 +47,13 @@ class DetectionRecord(Base):
     score: Mapped[float] = mapped_column(Float, nullable=False)
     mitre_ttp: Mapped[str] = mapped_column(String(255), nullable=False)
     evidence_json: Mapped[str] = mapped_column(Text, nullable=False)
-    correlation_id: Mapped[str | None] = mapped_column(String(128), index=True, nullable=True)
-    input_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    rule_pack_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    engine_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    correlation_id: Mapped[str] = mapped_column(String(128), index=True, nullable=False, default="legacy-unknown")
+    input_sha256: Mapped[str] = mapped_column(String(64), nullable=False, default="a97e70e1eb822b640fe54da6b0ff168b2d7ced9f2608957917b798376a8cd86f")
+    rule_pack_sha256: Mapped[str] = mapped_column(String(64), nullable=False, default="a6ba0e8c55cb1227f6cb8fd52231a0c1ec60ce95d069cedd2a781f2fc1a236c5")
+    engine_version: Mapped[str] = mapped_column(String(64), nullable=False, default="legacy-unverified")
     model_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    config_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    config_sha256: Mapped[str] = mapped_column(String(64), nullable=False, default="842433b27f3bfb9e9e405074ec4e058f29c4ce0cd63e9a5490c70f6a357af1e5")
+    provenance_state: Mapped[str] = mapped_column(String(32), nullable=False, default="legacy_unverified")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
@@ -204,7 +213,33 @@ def set_tenant_context(session: Session, tenant_id: str) -> None:
         session.execute(text("SELECT set_config('threatfade.tenant_id', :tenant_id, true)"), {"tenant_id": tenant_id})
 
 
-def save_detection(tenant_id: str, subject: str, source: str, result: Dict[str, Any], mitre_ttp: str, *, correlation_id: str | None = None, input_sha256: str | None = None, rule_pack_sha256: str | None = None, engine_version: str | None = None, model_sha256: str | None = None, config_sha256: str | None = None) -> int:
+def save_detection(
+    tenant_id: str,
+    subject: str,
+    source: str,
+    result: Dict[str, Any],
+    mitre_ttp: str,
+    *,
+    correlation_id: str,
+    input_sha256: str,
+    rule_pack_sha256: str,
+    engine_version: str,
+    config_sha256: str,
+    model_sha256: str | None = None,
+) -> int:
+    """Persist a detection only when its complete provenance contract is present."""
+    import re
+    if not correlation_id or not isinstance(correlation_id, str) or len(correlation_id) > 128:
+        raise ValueError("correlation_id is required")
+    for field_name, value in {
+        "input_sha256": input_sha256,
+        "rule_pack_sha256": rule_pack_sha256,
+        "config_sha256": config_sha256,
+    }.items():
+        if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
+            raise ValueError(f"{field_name} must be a lowercase SHA-256 digest")
+    if not engine_version or not isinstance(engine_version, str) or len(engine_version) > 64:
+        raise ValueError("engine_version is required")
     with Session(ENGINE) as session:
         set_tenant_context(session, tenant_id)
         record = DetectionRecord(
