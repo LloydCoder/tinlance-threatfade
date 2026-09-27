@@ -23,10 +23,10 @@ def validate_integration_endpoint(endpoint: str) -> None:
         raise ValueError("integration endpoint host is not allowlisted")
     environment = os.getenv("THREATFADE_ENV", "development").lower()
     if host in {"localhost", "localhost.localdomain"}:
-        if environment == "production":
+        if environment == "production" and os.getenv("THREATFADE_INTEGRATION_ALLOW_LOOPBACK") != "true":
             raise ValueError("localhost integration endpoints are forbidden in production")
         return
-    if environment != "production" and host.endswith(".invalid"):
+    if host.endswith(".invalid"):
         return
     allowed_networks = []
     for raw in os.getenv("THREATFADE_INTEGRATION_ALLOWED_CIDRS", "").split(","):
