@@ -1,3 +1,7 @@
+import os
+
+os.environ.setdefault("THREATFADE_INTEGRATION_ALLOW_LOOPBACK", "true")
+
 """Safe, disposable database isolation for PostgreSQL-backed test runs.
 
 When a PostgreSQL test URL is explicitly supplied, pytest creates a disposable
