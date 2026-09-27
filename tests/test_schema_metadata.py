@@ -31,7 +31,7 @@ EXPECTED_TABLES = {
 }
 
 
-def test_complete_metadata_contains_expected_24_tables():
+def test_complete_metadata_contains_expected_25_tables():
     assert set(Base.metadata.tables) == EXPECTED_TABLES
     assert len(Base.metadata.tables) == 24
 
