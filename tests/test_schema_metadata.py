@@ -28,12 +28,13 @@ EXPECTED_TABLES = {
     "identity_sessions",
     "environment_profiles",
     "environment_profile_audit",
+    "rate_limit_buckets",
 }
 
 
 def test_complete_metadata_contains_expected_25_tables():
     assert set(Base.metadata.tables) == EXPECTED_TABLES
-    assert len(Base.metadata.tables) == 24
+    assert len(Base.metadata.tables) == 25
 
 
 def test_environment_profile_schema_contract():
