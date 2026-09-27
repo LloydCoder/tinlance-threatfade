@@ -12,7 +12,7 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
-from sqlalchemy import BigInteger, DateTime, Float, Integer, String, Text, create_engine, select, text
+from sqlalchemy import BigInteger, DateTime, Float, Index, Integer, String, Text, create_engine, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 DATABASE_URL = os.getenv("THREATFADE_DATABASE_URL", "sqlite:///./threatfade.db")
@@ -30,6 +30,7 @@ class Base(DeclarativeBase):
 
 class RateLimitBucketRecord(Base):
     __tablename__ = "rate_limit_buckets"
+    __table_args__ = (Index("ix_rate_limit_buckets_window_start", "window_start"),)
     bucket_key: Mapped[str] = mapped_column(String(128), primary_key=True)
     window_start: Mapped[int] = mapped_column(BigInteger, nullable=False)
     request_count: Mapped[int] = mapped_column(Integer, nullable=False)
