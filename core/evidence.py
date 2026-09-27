@@ -7,7 +7,7 @@ import json
 from uuid import uuid4
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from .integrity import GENESIS_HASH, evidence_custody_hash, sha256_json, verify_content
@@ -23,7 +23,7 @@ def register_evidence(*, tenant_id: str, correlation_id: str, evidence_type: str
     metadata = metadata or {}
     with Session(ENGINE) as session:
         set_tenant_context(session, tenant_id)
-        previous = session.scalar(select(EvidenceRecord).where(EvidenceRecord.tenant_id == tenant_id).order_by(EvidenceRecord.id.desc()).limit(1))
+        # Serialize custody-chain appends per tenant to prevent concurrent forks.\n        if ENGINE.dialect.name == "postgresql":\n            session.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:tenant_id, 1))"), {"tenant_id": tenant_id})\n        previous = session.scalar(select(EvidenceRecord).where(EvidenceRecord.tenant_id == tenant_id).order_by(EvidenceRecord.id.desc()).limit(1))
         previous_hash = GENESIS_HASH if previous is None else previous.custody_hash
         custody_hash = evidence_custody_hash(
             previous_hash=previous_hash, tenant_id=tenant_id, correlation_id=correlation_id,
