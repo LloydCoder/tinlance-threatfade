@@ -14,10 +14,13 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "detections",
-        sa.Column("provenance_state", sa.String(length=32), nullable=False, server_default="complete"),
-    )
+    bind = op.get_bind()
+    existing_columns = {column["name"] for column in sa.inspect(bind).get_columns("detections")}
+    if "provenance_state" not in existing_columns:
+        op.add_column(
+            "detections",
+            sa.Column("provenance_state", sa.String(length=32), nullable=False, server_default="complete"),
+        )
     op.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
     op.execute(
         """
