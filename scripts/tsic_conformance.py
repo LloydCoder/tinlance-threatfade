@@ -34,7 +34,7 @@ def main() -> None:
 
     system = next(item for item in manifest["systems"] if item["id"] == "threatfade")
     assert system["repository"] == "LloydCoder/tinlance-threatfade"
-    assert system["governance_role"] == "security_engineering_authority"
+    assert system["governance_role"] == "domain_security_authority"
 
     assert adapter["source_system"] == "tsic"
     assert adapter["target_system"] == "threatfade"
