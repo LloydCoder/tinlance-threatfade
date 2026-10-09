@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
-ARG PYTHON_BASE_TAG=3.14.7-slim-trixie
+ARG PYTHON_BASE_TAG=3.14.8-slim-trixie
 ARG PYTHON_BASE_DIGEST=sha256:83ff1d245a3d57d04152252d3ef9cb361494d0b3395abd65a5ebe91c401c8e83
 FROM python:${PYTHON_BASE_TAG}@${PYTHON_BASE_DIGEST}
 
@@ -23,11 +23,11 @@ RUN apt-get update \
        libc-bin=2.41-12+deb13u4 \
        libc6=2.41-12+deb13u4 \
        gzip=1.13-1+deb13u1 \
-       libpcre2-8-0=10.46-1~deb13u2 \
+       libpcre2-8-0=10.46-1~deb13u3 \
        libsqlite3-0=3.46.1-7+deb13u2 \
-       libssl3t64=3.5.7-1~deb13u2 \
-       openssl=3.5.7-1~deb13u2 \
-       openssl-provider-legacy=3.5.7-1~deb13u2 \
+       libssl3t64=3.5.7-1~deb13u3 \
+       openssl=3.5.7-1~deb13u3 \
+       openssl-provider-legacy=3.5.7-1~deb13u3 \
        perl-base=5.40.1-6+deb13u1 \
     && rm -rf /var/lib/apt/lists/*
 
