@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import base64
 import json
+import time
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 TSIC_REVISION = "656a4ecff1f6ab3bc416d3cc9ae647636391e94d"
@@ -12,19 +13,46 @@ REQUIRED = {
     "trace-context",
     "economic-attribution",
 }
+RETRYABLE_HTTP_STATUSES = {429, 500, 502, 503, 504}
 
 
 def fetch_json(path: str) -> dict:
-    url = f"https://api.github.com/repos/LloydCoder/tinlance-system-integration/contents/{path}?ref={TSIC_REVISION}"
-    request = Request(
-        url,
-        headers={"Accept": "application/vnd.github+json", "User-Agent": "tinlance-threatfade-tsic"},
+    """Fetch a file from the immutable TSIC revision without GitHub REST API quotas."""
+    url = (
+        "https://raw.githubusercontent.com/"
+        f"LloydCoder/tinlance-system-integration/{TSIC_REVISION}/{path}"
     )
-    with urlopen(request, timeout=20) as response:
-        if response.status != 200:
-            raise RuntimeError(f"TSIC contents API returned HTTP {response.status}: {url}")
-        payload = json.load(response)
-    return json.loads(base64.b64decode(payload["content"].replace("\n", "")).decode("utf-8"))
+    for attempt in range(3):
+        request = Request(
+            url,
+            headers={
+                "Accept": "application/json",
+                "User-Agent": "tinlance-threatfade-tsic",
+            },
+        )
+        try:
+            with urlopen(request, timeout=20) as response:
+                if response.status != 200:
+                    raise RuntimeError(
+                        f"TSIC raw-content fetch returned HTTP {response.status}: {url}"
+                    )
+                payload = json.load(response)
+                if not isinstance(payload, dict):
+                    raise RuntimeError(f"TSIC contract must be a JSON object: {url}")
+                return payload
+        except HTTPError as exc:
+            if exc.code not in RETRYABLE_HTTP_STATUSES or attempt == 2:
+                raise RuntimeError(
+                    f"TSIC raw-content fetch failed with HTTP {exc.code}: {url}"
+                ) from exc
+            retry_after = exc.headers.get("Retry-After", "")
+            delay = int(retry_after) if retry_after.isdigit() else 2**attempt
+            time.sleep(min(max(delay, 1), 30))
+        except URLError as exc:
+            if attempt == 2:
+                raise RuntimeError(f"TSIC raw-content fetch failed: {url}") from exc
+            time.sleep(2**attempt)
+    raise RuntimeError(f"TSIC raw-content fetch exhausted retries: {url}")
 
 
 def main() -> None:
