@@ -3,22 +3,16 @@ title = "ThreatFade Gitleaks configuration"
 [extend]
 useDefault = true
 
-# Historical findings below were verified against the cited commit contents.
-# They are narrow false positives: an empty environment-variable example and
-# a Python local variable named "key" used to select a public JWKS signing key.
-# Commit and line-pattern conditions are both required, so other findings in
-# those commits remain detectable.
+# Narrow line-pattern suppressions for verified generic-api-key false positives.
+# The empty API-key assignment is a placeholder, not credential material. The
+# JWKS pattern selects a public signing key by kid; the local variable name
+# "key" is not a secret. These patterns do not suppress other findings in the
+# historical commits where the lines first appeared.
 [allowlist]
-description = "Verified historical generic-api-key false positives"
-commits = [
-  "1a0e28ee487b3044b16e4d523cbeb7b8f96238e0",
-  "b2d28b460d603fac4a221243172eabfbadae2588",
-  "acd70e7b9af052bbc9d691432f36f1ce1cbdc273",
-  "b324c93c722427261e4717508dac0e8443145b2e",
-]
+description = "Narrow verified historical generic-api-key false-positive line patterns"
 regexTarget = "line"
 regexes = [
   '^\s*def __init__\(self, key_material: Ed25519PrivateKey \| None = None\):\s*$',
   '^\s*THREATFADE_API_KEY=\s*$',
-  '^\s*kid=.*key=next.*$',
+  '^\s*kid=jwt\.get_unverified_header\(token\)\.get\("kid"\); key=next\(\(k for k in self\._load_jwks\(\)\.get\("keys",\[\]\) if k\.get\("kid"\)==kid\),None\)$',
 ]
