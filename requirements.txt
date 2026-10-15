@@ -1,4 +1,4 @@
-numpy>=2.5.3
+numpy>=2.4.6
 scipy>=1.10.0
 matplotlib>=3.11.1
 pyyaml>=6.0.3
@@ -14,8 +14,8 @@ scikit-learn>=1.9.0
 joblib>=1.5.3
 opentelemetry-api>=1.44.0
 PyJWT[crypto]>=2.13.0
-SQLAlchemy>=2.0.0
+SQLAlchemy>=2.0.54
 psycopg[binary]>=3.1.18
-alembic>=1.16.0
+alembic>=1.20.0
 cryptography>=50.0.1
 prometheus-client>=0.26.0,<0.27.0
