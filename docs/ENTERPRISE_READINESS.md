@@ -22,6 +22,10 @@ ThreatFade's engineering controls are aligned to OWASP ASVS 5.0, NIST CSF 2.0, s
 - Releases should be signed and accompanied by SBOM/provenance in production distribution pipelines.
 - Production telemetry must not contain secrets, raw PCAP payloads, authentication tokens, or unnecessary personal data.
 
+## Production Compose database credentials
+
+The production Compose topology fails closed unless `POSTGRES_PASSWORD`, `THREATFADE_APP_DB_USER`, and `THREATFADE_APP_DB_PASSWORD` are supplied. Keep these values in the deployment secret manager or a locally ignored environment file; do not commit populated values. The application database user must be provisioned with only the privileges required by the deployed application, while schema migrations run through a separately controlled migration identity. Because the Compose URL is a SQLAlchemy connection URI, percent-encode reserved characters in the username/password components. Verify the rendered configuration in the target deployment without printing secret values.
+
 ## Identity and tenancy
 
 The application security boundary is deliberately separated from the deployment identity provider. Enterprise deployments use an external OIDC provider such as Keycloak, Entra ID, Okta, Auth0, or an equivalent compliant provider.
