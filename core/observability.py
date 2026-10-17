@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+import os
 from time import perf_counter
 from typing import Iterator, Optional
 
@@ -81,3 +82,18 @@ def observe_http(method: str, route: str, status: int, duration: float) -> None:
     if PROMETHEUS_AVAILABLE:
         HTTP_REQUESTS.labels(method=method, route=route, status=str(status)).inc()
         HTTP_LATENCY.labels(method=method, route=route).observe(duration)
+
+
+def mount_metrics_if_enabled(app, metrics) -> bool:
+    """Mount Prometheus metrics only after explicit operational opt-in.
+
+    Publicly exposing /metrics can disclose runtime metadata and route-level
+    traffic patterns. Keep collection available internally, but do not expose
+    the scrape endpoint unless THREATFADE_METRICS_ENABLED is explicitly true.
+    Restrict the endpoint at the network/proxy layer as well when enabled.
+    """
+    enabled = os.getenv("THREATFADE_METRICS_ENABLED", "").strip().lower() in {"1", "true", "yes"}
+    if not enabled or metrics is None:
+        return False
+    app.mount("/metrics", metrics)
+    return True
