@@ -12,7 +12,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from api import app
 from core.enterprise_routes import router as enterprise_router
 from core.health import readiness_state
-from core.observability import initialize_metrics, observe_http, metrics_app
+from core.observability import initialize_metrics, observe_http, metrics_app, mount_metrics_if_enabled
 from core.reliability_routes import router as reliability_router
 
 
@@ -54,5 +54,4 @@ app.include_router(enterprise_router)
 app.include_router(reliability_router)
 
 _metrics = metrics_app()
-if _metrics is not None:
-    app.mount("/metrics", _metrics)
+mount_metrics_if_enabled(app, _metrics)
