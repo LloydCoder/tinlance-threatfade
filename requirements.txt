@@ -17,5 +17,5 @@ PyJWT[crypto]>=2.13.0
 SQLAlchemy>=2.1.4
 psycopg[binary]>=3.3.6
 alembic>=1.20.0
-cryptography>=50.0.1
+cryptography>=50.0.2
 prometheus-client>=0.26.0,<0.27.0
