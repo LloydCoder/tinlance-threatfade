@@ -93,6 +93,25 @@ docker inspect "$EXPECTED_CONTAINER" \
   | grep -q 'Status=running Health=healthy' \
   || fail "engine container is not healthy"
 
+echo "Verifying running version matches the checked-out source..."
+EXPECTED_VERSION="$(python -c 'import yaml; print(yaml.safe_load(open("config.yaml", encoding="utf-8"))["branding"]["version"])')"
+RUNNING_VERSION="$(docker exec "$EXPECTED_CONTAINER" python -c 'import json, urllib.request; print(json.load(urllib.request.urlopen("http://127.0.0.1:8080/version", timeout=3))["version"])')"
+[[ "$RUNNING_VERSION" == "$EXPECTED_VERSION" ]] \
+  || fail "running version $RUNNING_VERSION does not match source version $EXPECTED_VERSION"
+
+echo "Verifying readiness..."
+docker exec "$EXPECTED_CONTAINER" python -c 'import json, urllib.request; r=urllib.request.urlopen("http://127.0.0.1:8080/ready", timeout=3); payload=json.load(r); assert payload.get("status") == "ready", payload; print(payload)'
+
+echo "Verifying public metrics endpoint is disabled..."
+docker exec "$EXPECTED_CONTAINER" python -c 'import urllib.error, urllib.request; url="http://127.0.0.1:8080/metrics/";
+try:
+ urllib.request.urlopen(url, timeout=3)
+except urllib.error.HTTPError as e:
+ assert e.code == 404, f"expected 404 from {url}, got {e.code}"
+ print("metrics endpoint disabled (404)")
+else:
+ raise SystemExit("public metrics endpoint is mounted; expected HTTP 404")'
+
 echo "Alembic state (read-only verification):"
 docker exec "$EXPECTED_CONTAINER" sh -lc 'alembic current && alembic heads'
 
