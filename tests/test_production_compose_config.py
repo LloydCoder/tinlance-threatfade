@@ -16,3 +16,10 @@ def test_production_compose_requires_postgres_superuser_password():
     postgres_password = compose["services"]["postgres"]["environment"]["POSTGRES_PASSWORD"]
 
     assert postgres_password == "${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}"
+
+
+def test_production_compose_explicitly_disables_public_metrics():
+    compose = yaml.safe_load(Path("docker-compose.yml").read_text(encoding="utf-8"))
+    environment = compose["services"]["threatfade"]["environment"]
+
+    assert environment["THREATFADE_METRICS_ENABLED"] == "false"
