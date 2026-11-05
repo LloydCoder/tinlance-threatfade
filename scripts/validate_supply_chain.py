@@ -15,12 +15,14 @@ def assert_true(condition: bool, message: str) -> None:
 
 def main() -> None:
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
-    assert_true("ARG PYTHON_BASE_TAG=3.14.8-slim-trixie" in dockerfile, "Python base tag must target the patched supported 3.14.8 release")
+    assert_true("ARG PYTHON_BASE_TAG=3.14.10-slim-trixie" in dockerfile, "Python base tag must target the patched supported 3.14.10 release")
     assert_true("ARG PYTHON_BASE_DIGEST" in dockerfile and "FROM python:${PYTHON_BASE_TAG}@${PYTHON_BASE_DIGEST}" in dockerfile, "Python base image must be injected by immutable digest")
     assert_true("USER threatfade" in dockerfile, "container must run as non-root")
     assert_true("org.opencontainers.image.source" in dockerfile, "OCI source label required")
     assert_true("HEALTHCHECK" in dockerfile, "container healthcheck required")
     assert_true("--upgrade pip" in dockerfile, "pip must be upgraded during image build")
+    assert_true("setuptools==84.2.1" in dockerfile, "setuptools must use the patched 84.2.1 release")
+    assert_true("msgpack==1.2.4" in dockerfile, "msgpack must use the patched 1.2.4 release")
 
     workflow_dir = ROOT / ".github" / "workflows"
     workflow_text = "\n".join(p.read_text(encoding="utf-8") for p in workflow_dir.glob("*.yml"))
