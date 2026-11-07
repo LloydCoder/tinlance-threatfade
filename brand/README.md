@@ -1,6 +1,6 @@
 # ThreatFade brand assets
 
-These files are sourced from the owner-supplied ThreatFade Signal Trace logo kit v1.0. That kit remains the authoritative master source.
+These files are exact assets and tokens from the owner-supplied ThreatFade Signal Trace logo kit v1.0. The uploaded kit remains the authoritative master source.
 
 ## Rules
 - Full-color logo only on Navy `#0B1220` or Paper `#F4F6F8`.
@@ -11,14 +11,14 @@ These files are sourced from the owner-supplied ThreatFade Signal Trace logo kit
 - Minimum widths: horizontal 140 px, stacked 96 px, wordmark 100 px, mark 24 px. Below 24 px use the icon tile.
 - Inter is the UI/heading typeface; JetBrains Mono is for code and metrics.
 
-## Files
-- `threatfade-mark-on-dark.svg`: approved full-color Signal Trace mark for dark UI.
-- `dashboard/assets/brand/favicon.svg`: approved browser icon.
-- `dashboard/assets/brand/site.webmanifest`: PWA identity metadata.
-- `dashboard/assets/brand/brand.css`: canonical CSS custom properties.
-- `brand/colors.json`: machine-readable color tokens.
+## Exact supplied assets
+- `assets/threatfade-mark-on-dark.svg` and `assets/threatfade-mark-on-light.svg`: exact supplied Signal Trace variants.
+- `dashboard/assets/brand/threatfade-mark-on-dark.svg`: dashboard mark served at `/assets/brand/threatfade-mark-on-dark.svg`.
+- `dashboard/assets/brand/favicon.svg`: exact supplied favicon.
+- `dashboard/assets/brand/site.webmanifest`: PWA metadata using the shipped SVG favicon.
+- `dashboard/assets/brand/brand.css` and `colors.json`: exact canonical CSS and machine-readable tokens.
 
-The dashboard serves `dashboard/assets/brand/` at `/assets/brand/`.
+The FastAPI application mounts only the dashboard's static `assets` directory at `/assets`. Authenticated API and tenant routes are unchanged.
 
 ## GitHub social preview
-GitHub's repository social preview is a repository setting, not a tracked file. Upload the official 1280×640 dark preview PNG from the supplied kit under **Repository → Settings → General → Social preview** after this branch is merged. This change does not claim to have changed that remote setting.
+GitHub's repository-level social preview is a remote setting, not a tracked file. Upload the official 1280×640 PNG from the supplied kit under **Repository → Settings → General → Social preview** after review. This PR does not claim that remote setting was changed.
