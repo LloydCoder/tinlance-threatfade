@@ -45,4 +45,5 @@ def test_public_brand_assets_exist_and_manifest_is_consistent() -> None:
 
 def test_api_mounts_only_dashboard_static_assets_for_brand_resources() -> None:
     api = (ROOT / "api.py").read_text(encoding="utf-8")
-    assert 'app.mount("/assets", StaticFiles(directory="dashboard/assets"), name="public-brand-assets")' in api
+    assert 'BASE_DIR = Path(__file__).resolve().parent' in api
+    assert 'StaticFiles(directory=str(BASE_DIR / "dashboard" / "assets"), check_dir=False)' in api
