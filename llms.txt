@@ -19,6 +19,7 @@ ThreatFade is an open-core network threat detection and investigation platform d
 - [Documentation index](docs/README.md): documentation map organized around tutorials, how-to guides, explanation and reference.
 - [Configuration reference](docs/reference/configuration.md): environment and deployment configuration.
 - [Build status](docs/BUILD_STATUS.md): implementation status and remaining external assurance work.
+- [GitHub repository settings](docs/REPOSITORY_SETTINGS.md): About metadata, social preview, branch protection and release guidance.
 - [Public truth manifest](docs/public-truth.json): machine-readable capability and validation boundaries.
 
 ## Architecture and security
