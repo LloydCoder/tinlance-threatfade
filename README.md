@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="brand/assets/threatfade-mark-on-dark.svg" alt="ThreatFade Signal Trace mark" width="110">
+  <img src="brand/assets/threatfade-mark-on-light.svg" alt="ThreatFade Signal Trace mark" width="56"> <img src="brand/assets/threatfade-wordmark-on-light.svg" alt="ThreatFade official outlined wordmark" width="190">
 </p>
 
 <h1 align="center">ThreatFade</h1>
