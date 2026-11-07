@@ -21,6 +21,7 @@ REQUIRED = {
     "redirect refusal": "allow_redirects=False",
     "session validation": "validate_session(session_token, principal.subject)",
     "random session token": "secrets.token_urlsafe(32)",
+    "disabled account rejection": "if bool(user.disabled):",
     "verified invitation email": "principal.claims.get(\"email\")",
 }
 

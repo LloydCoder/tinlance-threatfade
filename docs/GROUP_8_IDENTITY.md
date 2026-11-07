@@ -27,6 +27,7 @@
 
 ### Authorization
 
+- Disabled customer identity records are rejected after cryptographic OIDC validation and before a principal is returned; disabling an account therefore blocks all bearer-authenticated routes, including session creation.
 - Roles are explicit and allow-listed.
 - Permissions are derived from roles/scopes.
 - Unsupported role/scopes are not elevated implicitly.
