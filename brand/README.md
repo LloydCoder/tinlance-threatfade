@@ -14,7 +14,7 @@ These files are exact assets and tokens from the owner-supplied ThreatFade Signa
 ## Exact supplied assets
 - `assets/threatfade-mark-on-dark.svg` and `assets/threatfade-mark-on-light.svg`: exact supplied Signal Trace variants.
 - `dashboard/assets/brand/threatfade-mark-on-dark.svg`: dashboard mark served at `/assets/brand/threatfade-mark-on-dark.svg`.
-- `dashboard/assets/brand/favicon.svg`: exact supplied favicon.
+- `dashboard/assets/brand/favicon.svg` and `safari-pinned-tab.svg`: exact supplied browser icons.
 - `dashboard/assets/brand/site.webmanifest`: PWA metadata using the shipped SVG favicon.
 - `dashboard/assets/brand/brand.css` and `colors.json`: exact canonical CSS and machine-readable tokens.
 
