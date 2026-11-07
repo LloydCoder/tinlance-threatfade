@@ -12,7 +12,7 @@ def test_dashboard_uses_official_signal_trace_logo_and_palette() -> None:
     assert 'src="/assets/brand/threatfade-mark-on-dark.svg"' in html
     assert 'href="/assets/brand/favicon.svg"' in html
     assert 'href="/assets/brand/site.webmanifest"' in html
-    assert "--accent:#F5A524" in html
+    assert "--accent:var(--tf-signal)" in html
     assert "#59e1cf" not in html
     assert ">TF</div>" not in html
     assert "<b>ThreatFade</b>" not in html
