@@ -23,6 +23,7 @@ def main() -> None:
     assert_true("--upgrade pip" in dockerfile, "pip must be upgraded during image build")
     assert_true("setuptools==84.2.1" in dockerfile, "setuptools must use the patched 84.2.1 release")
     assert_true("msgpack==1.2.4" in dockerfile, "msgpack must use the patched 1.2.4 release")
+    assert_true("apt=3.0.4" in dockerfile and "libapt-pkg7.0=3.0.4" in dockerfile, "Debian Trixie APT packages must use the CVE-2026-109518 fixed 3.0.4 release")
 
     workflow_dir = ROOT / ".github" / "workflows"
     workflow_text = "\n".join(p.read_text(encoding="utf-8") for p in workflow_dir.glob("*.yml"))
