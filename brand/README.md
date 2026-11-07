@@ -15,7 +15,7 @@ The owner-supplied **ThreatFade logo kit v1.0** is the authoritative brand sourc
 ## Repository assets
 
 - `assets/threatfade-mark-on-dark.svg` and `assets/threatfade-mark-on-light.svg`: official Signal Trace mark variants.
-- `assets/threatfade-wordmark-on-light.svg`: wordmark artwork used with the light-surface mark in the README.
+- The outlined horizontal and standalone wordmark SVGs remain in the owner-supplied source kit; do not recreate them from text or substitute a retyped logo.
 - `dashboard/assets/brand/favicon.svg` and `safari-pinned-tab.svg`: browser identity assets.
 - `dashboard/assets/brand/site.webmanifest`: current PWA metadata.
 - `dashboard/assets/brand/brand.css` and `colors.json`: dashboard theme tokens.
