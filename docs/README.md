@@ -41,6 +41,7 @@ Concepts, design rationale and system behavior:
 - [Ground-truth dataset standard](GROUND_TRUTH_DATASET_STANDARD.md)
 - [Environment profiles](ENVIRONMENT_PROFILES.md)
 - [Enterprise integration contracts](ENTERPRISE_INTEGRATIONS.md)
+- [GitHub About, social preview and branch-protection guidance](REPOSITORY_SETTINGS.md)
 - [Public capability/evidence manifest](public-truth.json)
 - [Build status](BUILD_STATUS.md)
 - [Independent assurance package](evaluation/INDEPENDENT_VALIDATION_PACKAGE.md)
