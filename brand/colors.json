@@ -1,0 +1,10 @@
+[
+  {"token":"navy","name":"Navy","hex":"#0B1220","rgb":[11,18,32],"usage":"Primary dark background, text on light"},
+  {"token":"navy-raised","name":"Navy raised","hex":"#16233B","rgb":[22,35,59],"usage":"Cards and panels on dark"},
+  {"token":"mist","name":"Mist","hex":"#E6EDF3","rgb":[230,237,243],"usage":"Text and line on dark"},
+  {"token":"paper","name":"Paper","hex":"#F4F6F8","rgb":[244,246,248],"usage":"Light background"},
+  {"token":"signal","name":"Signal amber","hex":"#F5A524","rgb":[245,165,36],"usage":"Spike and key accent on dark"},
+  {"token":"signal-on-light","name":"Signal amber on light","hex":"#C27200","rgb":[194,114,0],"usage":"Spike and key accent on light"},
+  {"token":"slate-on-light","name":"Slate on light","hex":"#56657A","rgb":[86,101,122],"usage":"Secondary text on light"},
+  {"token":"slate-on-dark","name":"Slate on dark","hex":"#94A3B8","rgb":[148,163,184],"usage":"Secondary text on dark"}
+]

@@ -1,0 +1,14 @@
+:root{
+  --tf-navy:#0B1220; --tf-navy-raised:#16233B; --tf-mist:#E6EDF3; --tf-paper:#F4F6F8;
+  --tf-signal:#F5A524; --tf-signal-on-light:#C27200;
+  --tf-slate-on-light:#56657A; --tf-slate-on-dark:#94A3B8;
+  --tf-font-sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --tf-font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+/* Dark is the default product theme; light surfaces use the on-light accent. */
+body{background:var(--tf-navy);color:var(--tf-mist);font-family:var(--tf-font-sans)}
+.tf-accent{color:var(--tf-signal)}
+@media (prefers-color-scheme:light){
+  body{background:var(--tf-paper);color:var(--tf-navy)}
+  .tf-accent{color:var(--tf-signal-on-light)}
+}
