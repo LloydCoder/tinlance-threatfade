@@ -1,4 +1,4 @@
-![ThreatFade — signal trace identity](brand/assets/threatfade-horizontal-on-dark.svg)
+![ThreatFade — signal trace identity](brand/assets/threatfade-mark-on-dark.svg)
 
 # ThreatFade
 
