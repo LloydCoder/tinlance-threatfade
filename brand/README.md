@@ -13,10 +13,10 @@ These files are sourced from the owner-supplied ThreatFade Signal Trace logo kit
 
 ## Files
 - `threatfade-mark-on-dark.svg`: approved full-color Signal Trace mark for dark UI.
-- `favicon.svg`: approved browser icon.
-- `site.webmanifest`: PWA identity metadata.
-- `brand.css`: canonical CSS custom properties.
-- `colors.json`: machine-readable color tokens.
+- `dashboard/assets/brand/favicon.svg`: approved browser icon.
+- `dashboard/assets/brand/site.webmanifest`: PWA identity metadata.
+- `dashboard/assets/brand/brand.css`: canonical CSS custom properties.
+- `brand/colors.json`: machine-readable color tokens.
 
 The dashboard serves `dashboard/assets/brand/` at `/assets/brand/`.
 
