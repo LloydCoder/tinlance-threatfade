@@ -10,7 +10,7 @@ BRAND = ROOT / "dashboard" / "assets" / "brand"
 
 def _git_blob_sha(path: Path) -> str:
     content = path.read_bytes()
-    return hashlib.sha1(b"blob " + str(len(content)).encode() + b"\\0" + content).hexdigest()
+    return hashlib.sha1(b"blob " + str(len(content)).encode() + bytes([0]) + content).hexdigest()
 
 
 def test_dashboard_uses_official_signal_trace_logo_and_palette() -> None:
