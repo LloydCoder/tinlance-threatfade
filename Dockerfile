@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
-ARG PYTHON_BASE_TAG=3.14.8-slim-trixie
-ARG PYTHON_BASE_DIGEST=sha256:f85c5697265c178cc6887276c55fe16cf3d14ca35c3df6a5eab3b360534a55d2
+ARG PYTHON_BASE_TAG=3.14.10-slim-trixie
+ARG PYTHON_BASE_DIGEST=sha256:ec6a14df5b63e3fbb3498e3240f7f640c230f9dca67683d23265db3866697f2d
 FROM python:${PYTHON_BASE_TAG}@${PYTHON_BASE_DIGEST}
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -20,6 +20,8 @@ WORKDIR /app
 # vulnerability database. Exact versions keep the build reproducible.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+       apt=3.0.4 \
+       libapt-pkg7.0=3.0.4 \
        libc-bin=2.41-12+deb13u4 \
        libc6=2.41-12+deb13u4 \
        gzip=1.13-1+deb13u1 \
@@ -32,9 +34,10 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
-RUN python -m pip install --no-cache-dir --disable-pip-version-check --upgrade pip setuptools==84.0.0 msgpack==1.2.1 \
+RUN python -m pip install --no-cache-dir --disable-pip-version-check --upgrade pip setuptools==84.2.1 msgpack==1.2.4 \
     && python -m pip install --no-cache-dir --disable-pip-version-check -r requirements.txt \
-    && python -m pip install --no-cache-dir --disable-pip-version-check --upgrade setuptools==84.0.0 msgpack==1.2.1
+    && python -m pip install --no-cache-dir --disable-pip-version-check --upgrade setuptools==84.2.1 msgpack==1.2.4 \
+    && python -c "import msgpack, setuptools, sys; assert sys.version_info[:3] >= (3, 14, 10); assert msgpack.__version__ == '1.2.4'; assert setuptools.__version__ == '84.2.1'"
 COPY . .
 
 RUN mkdir -p /app/reports /app/tmp && chown -R threatfade:threatfade /app
