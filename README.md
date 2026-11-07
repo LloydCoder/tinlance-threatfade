@@ -254,7 +254,7 @@ FusionOps remains an external integration boundary and is not replaced by the en
 
 ## Brand identity
 
-ThreatFade uses the official **Signal Trace** identity. The source logo, icon and color tokens are maintained in [brand/assets](brand/assets/) and [brand/README.md](brand/README.md). Do not redraw or retype the outlined wordmark.
+ThreatFade uses the official **Signal Trace** identity. The official mark sources and token reference are maintained in [brand/assets](brand/assets/), [brand/colors.json](brand/colors.json) and [brand/README.md](brand/README.md). Do not redraw or retype the outlined wordmark.
 
 - Primary navy: `#0B1220`
 - Raised navy: `#16233B`
