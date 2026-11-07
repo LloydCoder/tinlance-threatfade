@@ -1,0 +1,18 @@
+{
+  "name": "ThreatFade",
+  "short_name": "ThreatFade",
+  "description": "Evidence-first network threat detection and investigation platform.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0B1220",
+  "theme_color": "#0B1220",
+  "icons": [
+    {
+      "src": "/assets/brand/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
