@@ -20,6 +20,8 @@ WORKDIR /app
 # vulnerability database. Exact versions keep the build reproducible.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+       apt=3.0.4 \
+       libapt-pkg7.0=3.0.4 \
        libc-bin=2.41-12+deb13u4 \
        libc6=2.41-12+deb13u4 \
        gzip=1.13-1+deb13u1 \
