@@ -1,0 +1,63 @@
+# ThreatFade
+
+> Evidence-first detection and investigation for security teams monitoring adversarial activity that deliberately fades from view.
+
+ThreatFade is an open-core network threat detection and investigation platform developed by Tinlance Limited. The repository includes a Python detection engine, FastAPI control plane, analyst dashboard, offline evidence transport, enterprise identity and tenancy primitives, SIEM/SOAR adapters, deployment assets and validation tooling.
+
+## Project status and evidence boundaries
+
+- The development baseline in the repository is v0.9.0-dev; the latest published GitHub release observed during this documentation update is v0.3.0.
+- Repository tests and synthetic benchmarks are engineering/regression evidence, not independent real-world detection validation.
+- Experimental Isolation Forest functionality is not the authoritative production detector.
+- Integration adapters are repository-implemented and contract-tested; live connectivity and vendor certification are not implied.
+- Repository preparation does not establish independent penetration testing, formal certification, or customer-scale field performance.
+- Temporal correlation indicates observed association, not causal attribution.
+
+## Start here
+
+- [README](README.md): product overview, quick start, usage and installation.
+- [Documentation index](docs/README.md): documentation map organized around tutorials, how-to guides, explanation and reference.
+- [Configuration reference](docs/reference/configuration.md): environment and deployment configuration.
+- [Build status](docs/BUILD_STATUS.md): implementation status and remaining external assurance work.
+- [GitHub repository settings](docs/REPOSITORY_SETTINGS.md): About metadata, social preview, branch protection and release guidance.
+- [Public truth manifest](docs/public-truth.json): machine-readable capability and validation boundaries.
+
+## Architecture and security
+
+- [Security architecture](docs/SECURITY_ARCHITECTURE.md)
+- [Threat model](docs/THREAT_MODEL.md)
+- [ASVS 5.0 matrix](docs/ASVS_5.0_MATRIX.md)
+- [Secure deployment and supply chain](docs/SECURE_DEPLOYMENT.md)
+- [Disaster recovery](docs/DISASTER_RECOVERY.md)
+- [Architecture decision records](docs/adr/)
+
+## Detection and operations
+
+- [Detection evaluation](docs/DETECTION_EVALUATION.md)
+- [Sensor runtime](docs/SENSOR_RUNTIME.md)
+- [Enterprise integrations](docs/ENTERPRISE_INTEGRATIONS.md)
+- [Alerting](docs/alerting.md)
+- [Performance methodology](benchmarks/README.md)
+- [Independent validation package](docs/evaluation/INDEPENDENT_VALIDATION_PACKAGE.md)
+
+## Community and policy
+
+- [Contributing](CONTRIBUTING.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security policy](SECURITY.md)
+- [Support](SUPPORT.md)
+- [Changelog](CHANGELOG.md)
+- [License](LICENSE)
+
+## Repository entry points
+
+- `api.py`: local development FastAPI application and dashboard route.
+- `enterprise_app.py`: enterprise application assembly.
+- `main.py`: command-line signal simulation and analysis.
+- `core/`: detection, evidence, identity, tenancy, storage and integration logic.
+- `agents/`: sensor and runtime components.
+- `dashboard/`: analyst dashboard and public brand assets.
+- `tests/`, `test_*.py`, `benchmarks/`, `scripts/`: tests, benchmarks and validators.
+- `deploy/`: reference deployment assets.
+
+For authoritative behavior, prefer executable source, tests, workflow definitions and the current configuration reference over historical phase notes.

@@ -1,0 +1,47 @@
+name: Feature request
+description: Propose a project improvement with a clear user problem.
+title: "feature: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For security-sensitive proposals, avoid publishing exploit details or customer information.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and affected users
+      description: What workflow or user need is not adequately supported?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe the measurable or observable result.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Include alternatives and trade-offs where relevant.
+    validations:
+      required: false
+  - type: textarea
+    id: security
+    attributes:
+      label: Security, privacy and operational considerations
+      description: Consider tenant boundaries, evidence integrity, resource limits, auditability and deployment impact.
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Submission checks
+      options:
+        - label: I searched existing issues and documentation.
+          required: true
+        - label: This request does not disclose secrets or sensitive customer data.
+          required: true

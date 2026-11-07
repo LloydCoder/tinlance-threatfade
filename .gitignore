@@ -30,3 +30,16 @@ reports/*.json
 !reports/.gitkeep
 test_pcaps/
 *.backup
+
+# Additional local tooling and generated artifacts
+.ruff_cache/
+.mypy_cache/
+.tox/
+.nox/
+.pytest_cache/
+.coverage.*
+*.sqlite
+*.sqlite3
+*.db
+.env.*
+!.env.example

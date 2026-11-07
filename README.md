@@ -1,265 +1,228 @@
-![ThreatFade — signal trace identity](brand/assets/threatfade-mark-on-light.svg)
+<p align="center">
+  <img src="brand/assets/threatfade-mark-on-light.svg" alt="ThreatFade Signal Trace mark" width="96">
+</p>
 
-# ThreatFade
+<h1 align="center">ThreatFade</h1>
+<p align="center"><strong>Evidence-first detection and investigation for security teams monitoring adversarial activity that deliberately fades from view.</strong></p>
+<p align="center">
+  <a href="https://github.com/LloydCoder/tinlance-threatfade/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/LloydCoder/tinlance-threatfade/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="https://github.com/LloydCoder/tinlance-threatfade/actions/workflows/security.yml"><img alt="Security" src="https://github.com/LloydCoder/tinlance-threatfade/actions/workflows/security.yml/badge.svg?branch=main"></a>
+  <a href="https://github.com/LloydCoder/tinlance-threatfade/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/LloydCoder/tinlance-threatfade"></a>
+</p>
 
-**Evasion Interception Platform** by Tinlance Limited.
+## At a glance
 
-ThreatFade detects moments when adversaries intentionally reduce observable signals—including C2 quieting, gradual living-off-the-land activity reduction and GNSS interference—using entropy analysis, statistical deviation, heuristic detection, confidence scoring, optional experimental ML anomaly detection, multi-domain temporal correlation, ATT&CK mapping, interoperable exports and operational integrations.
+ThreatFade looks for meaningful reductions or changes in observable network and signal activity, including command-and-control (C2) quieting, gradual living-off-the-land (LOTL) activity changes and GNSS interference. It combines statistical signal analysis, detection rules, temporal correlation and structured evidence to support analyst investigation.
 
-**Status:** v0.9.0-dev — enterprise engineering baseline  
-**License:** Apache 2.0 (open-core)
+```mermaid
+flowchart LR
+  A[PCAP / signal input] --> B[Feature extraction]
+  B --> C[Statistical and rule-based detection]
+  C --> D[Temporal correlation]
+  D --> E[Evidence and confidence]
+  E --> F[Tenant-scoped API and analyst workflow]
+  F --> G[SIEM / SOAR adapters]
+```
 
-## What ThreatFade is
+> [!NOTE]
+> This is an architecture view, not a hosted product demonstration. A current dashboard screenshot or short demo recording has not yet been supplied for this repository; no fabricated demo is presented.
 
-ThreatFade is an **evidence-first detection and investigation platform**. Its core thesis is that adversarial activity can become less observable on purpose. Instead of treating a reduction in network or signal activity as automatically benign, ThreatFade models the change, scores the deviation and preserves the evidence required for analyst review.
+## Why ThreatFade
 
-The product is designed around one operational loop:
+| Problem | Approach | Evidence boundary |
+|---|---|---|
+| Adversary activity becomes quieter or less observable | Rolling entropy, statistical deviation and detection rules | Synthetic regression is not external detection validation |
+| Signals span multiple domains | Reusable temporal correlation and detection packs | Temporal association is not causal attribution |
+| Analysts need explainable outcomes | Structured evidence, confidence context and ATT&CK mapping | ATT&CK mapping does not establish attribution |
+| Sensors may lose control-plane connectivity | Bounded store-and-forward and signed replay-safe batches | Operational limits depend on deployment configuration |
+| Enterprise teams need controlled access | OIDC/JWT, RBAC, tenant-scoped resources and audit events | A live IdP/database and independent review remain deployment work |
 
-**Prioritize → Inspect → Pivot → Disposition → Handoff**
-
-The repository contains the detection engine, API, analyst console, validation/benchmarking framework, interoperability layer and enterprise engineering foundations. It does not claim that source code alone proves SOC 2/ISO certification, third-party penetration testing, independent detection validation, contractual SLAs or customer-scale performance. Those require real operational and independent assurance.
-
-## ThreatFade Dashboard
-
-The repository includes a dedicated **ThreatFade Dashboard** (`dashboard/index.html`) designed as a SOC investigation console rather than a decorative telemetry page.
-
-The current UX includes:
-
-- Priority queue for evidence-backed detections.
-- Open-alert, high-confidence, detection-rate, score and platform-health KPIs.
-- Recent detection activity visualization.
-- Tenant-scoped detection-record table.
-- Investigation drawer with structured evidence, confidence, z-outlier, score and ATT&CK context.
-- Analyst disposition actions and an explicit investigation workflow.
-- Detection simulation controls for C2 quieting, LOTL gradual fade, GNSS jamming, normal-with-fade and mixed scenarios.
-- Multi-domain correlation evidence visualization with explicit temporal window and clock-tolerance context.
-- Experimental ML evaluation layer isolated from production promotion.
-- API health/readiness and operational posture signals.
-- Validation posture showing repository evidence separately from external assurance.
-- Responsive desktop/tablet/mobile layouts.
-- Keyboard-friendly investigation dismissal and explicit loading, empty and degraded states.
-- No third-party frontend dependency required for the reference console.
+ThreatFade is an evidence-first detection and investigation platform. It is not a general-purpose EDR replacement, a guarantee of threat prevention, or a substitute for a customer's SOC processes.
 
 ## Quick start
+
+The following starts the local development API and dashboard. The first dependency installation may take longer than 30 seconds.
 
 ```bash
 git clone https://github.com/LloydCoder/tinlance-threatfade.git
 cd tinlance-threatfade
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+python -m venv .venv && source .venv/bin/activate
+python -m pip install -r requirements.txt
 python api.py
 ```
 
-Open:
+Open [http://localhost:8080](http://localhost:8080). API documentation: [http://localhost:8080/docs](http://localhost:8080/docs).
 
-```text
-http://localhost:8080/dashboard/
-```
-
-Health/readiness:
+Verify the service:
 
 ```bash
-curl http://localhost:8080/health
-curl http://localhost:8080/ready
-curl http://localhost:8080/version
+curl --fail http://localhost:8080/health
+curl --fail http://localhost:8080/ready
+curl --fail http://localhost:8080/version
 ```
 
-Local development is intentionally permissive. Production authentication is fail-closed and requires the configured identity boundary.
+> [!WARNING]
+> This is a local development setup. Do not expose it to the public internet. Production mode requires a configured identity provider, database, TLS/edge controls, secret injection and deployment hardening. See [Secure deployment](docs/SECURE_DEPLOYMENT.md).
 
-## Architecture
+## Installation
 
-```text
-                           Enterprise IdP
-                                │
-                           OIDC / JWT
-                                │
-Users / SIEM ── TLS / Edge ── ThreatFade Control Plane
-                                │
-                  ┌─────────────┼─────────────┐
-                  │             │             │
-               Auth/RBAC   Tenant policy   Audit
-                  │             │             │
-                  └─────────────┼─────────────┘
-                                │
-                         Detection Data Plane
-                                │
-                  PCAP / live signals / ML
-                                │
-                    Detection + Evidence Engine
-                                │
-              ┌─────────────────┼─────────────────┐
-              │                 │                 │
-        Domain observations  Temporal         Evidence +
-        (network/GNSS/...)  correlation       confidence
-              │                 │                 │
-              └─────────────────┼─────────────────┘
-                                │
-                 Local bounded durable queue
-                                │
-                    Signed batch / replay-safe
-                                │
-                  Control-plane ingestion
-                                │
-          Postgres / object-export / telemetry / analyst console
-                                │
-             Normalized IntegrationEvent / delivery transport
-                                │
-      Elastic / Sentinel / QRadar / Graylog / Wazuh / CTI / SOAR
-                                │
-                         FusionOps boundary
+### Prerequisites
+
+| Requirement | Purpose |
+|---|---|
+| Python 3.11 or 3.12 | Supported CI/test matrix |
+| pip and Git | Dependency installation and source checkout |
+| Linux/macOS/Windows | Local development; live capture has platform-specific requirements |
+| Docker Engine and Compose plugin | Container deployment |
+| PostgreSQL 16-compatible service | Production persistence |
+
+The container build currently uses Python 3.14.10 on Debian Trixie. The local CI test matrix uses Python 3.11 and 3.12. Optional sensor/native dependencies may behave differently across operating systems.
+
+### Windows PowerShell
+
+```powershell
+git clone https://github.com/LloydCoder/tinlance-threatfade.git
+Set-Location tinlance-threatfade
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python api.py
 ```
 
-The implementation separates control-plane concerns from detection workloads. Detection records and audit events are tenant-scoped; production deployments use durable PostgreSQL persistence. The Phase 2 transport layer is intentionally local and bounded: control-plane loss does not require a sensor to discard queued events.
+### Docker Compose
 
-## Detection pipeline
+The production Compose file is a hardened reference deployment, not a zero-configuration demo. It requires PostgreSQL and application database credentials, OIDC issuer and audience, allowed origins, and an existing external Docker network named `threatfade_proxy`. Supply values through a secret manager or ignored local environment file; never commit populated secrets.
 
-```text
-Signal / PCAP
-  → signal extraction
-  → rolling entropy + statistical deviation
-  → domain-specific detection rules
-  → canonical SignalEvent
-  → bounded durable local queue when transport is unavailable
-  → signed batch + replay/idempotency metadata
-  → server verification / idempotent ingestion
-  → optional temporal multi-domain correlation
-  → confidence + structured evidence
-  → ATT&CK mapping
-  → normalized IntegrationEvent
-  → shared retry/idempotency/audit transport
-  → SIEM / CTI / SOAR / FusionOps destination
-  → tenant-scoped durable record + audit event
-  → analyst investigation / disposition
+Review [Secure deployment](docs/SECURE_DEPLOYMENT.md) and [Configuration reference](docs/reference/configuration.md) before using Compose.
+
+## Usage
+
+### Dashboard and API
+
+After `python api.py` starts:
+
+- Dashboard: `http://localhost:8080/`
+- OpenAPI UI: `http://localhost:8080/docs`
+- Health: `GET /health`
+- Readiness: `GET /ready`
+- Version: `GET /version`
+
+### Run a scenario through the API
+
+The local development authentication behavior is intentionally different from production. Use a local test environment; do not treat this as a production credential pattern.
+
+```bash
+curl --fail-with-body \
+  -H 'Content-Type: application/json' \
+  -X POST http://localhost:8080/detect/scenario \
+  -d '{"scenario":"c2_quieting","use_ml":false}'
 ```
 
-Multi-domain correlation is implemented as a reusable, domain-agnostic temporal layer. GNSS disruption ↔ network fade/C2 is the first detection-pack implementation. Correlation results are explicitly **observed temporal association**, not causal attribution.
+Supported scenario names: `c2_quieting`, `lotl_gradual`, `gnss_jam`, `normal_with_fade`, `mixed`.
 
-Phase 2 also defines the portable **ThreatFade Evidence Package v1** for offline transfer and verification. Cryptographic verification establishes integrity/authenticity of the signed bytes; it does not prove sensor truth, maliciousness or causality.
+### Run the command-line simulator
 
-## Detection capabilities
+```bash
+python main.py --scenario c2_quieting
+```
 
-- PCAP/PCAPNG ingestion.
-- Hybrid encrypted/unencrypted signal extraction.
-- Rolling Shannon entropy.
-- Z-score anomaly detection.
-- C2, LOTL and GNSS fade scenarios.
-- Reusable temporal multi-domain correlation.
-- GNSS disruption ↔ network fade/C2 correlation detection pack.
-- **Experimental** Isolation Forest comparator; not a production replacement.
-- Structured evidence and confidence scoring.
-- Alert deduplication.
-- Live network/process monitoring components.
-- AIS/ADS-B/GPS signal-fusion components.
-- Deterministic benchmarks and robustness tests.
-- Bounded durable store-and-forward transport when the control plane is unavailable.
-- Signed replay-safe batches and portable offline evidence packages.
+Optional arguments include `--data`, `--export`, `--live`, `--duration` and `--use-ml`. Live capture requires appropriate permissions and platform dependencies. See the [sensor runtime guide](docs/SENSOR_RUNTIME.md).
 
-### Detection-as-code
+### Run tests
 
-Detection packs use stable IDs, semantic versions, descriptions and ATT&CK mappings. The intended lifecycle is:
+```bash
+python -m pytest -q
+```
 
-**Research → Backtest → Canary → Production → Deprecated**
+CI additionally runs architecture validators, PostgreSQL migration checks, benchmarks, integration checks and supply-chain gates. See [CI workflow](.github/workflows/ci.yml).
 
-Core rules include `TF-C2-001`, `TF-LOTL-001`, `TF-GNSS-001` and `TF-GNSS-CORR-001`.
+## Configuration
 
-## Phase 7 — Performance and Scale
+The baseline is in `config.yaml`; deployment-specific behavior is controlled by environment variables. This table lists values verified in the current source and Compose configuration, not every optional integration variable.
 
-ThreatFade does **not** claim a roadmap-derived 1M+ packets/sec capability. Phase 7 first measures the actual system and only then selects the appropriate optimization technique.
+| Setting | Default / requirement | Purpose |
+|---|---|---|
+| `THREATFADE_ENV` | `development` | Runtime environment |
+| `THREATFADE_ALLOWED_ORIGINS` | `http://localhost:8080` | Comma-separated CORS origins |
+| `THREATFADE_MAX_BODY_BYTES` | `2097152` | API request body limit |
+| `THREATFADE_MAX_PCAP_BYTES` | `104857600` in example | Maximum PCAP upload bytes |
+| `THREATFADE_MAX_PCAP_PACKETS` | `1000000` in example | Maximum PCAP packet count |
+| `THREATFADE_PCAP_TIMEOUT_SECONDS` | `30` in example | PCAP processing timeout |
+| `THREATFADE_PCAP_MAX_MEMORY_MB` | `512` in example | PCAP processing memory bound |
+| `THREATFADE_RATE_LIMIT` | `120` in example | Request rate limit |
+| `THREATFADE_RATE_WINDOW_SECONDS` | `60` in example | Rate-limit window |
+| `THREATFADE_OIDC_ISSUER` | Required in production Compose | OIDC issuer |
+| `THREATFADE_OIDC_AUDIENCE` | Required in production Compose | Expected token audience |
+| `THREATFADE_OIDC_JWKS_URL` | Optional in Compose | Signing-key discovery endpoint |
+| `THREATFADE_DATABASE_URL` | Required by production Compose | SQLAlchemy database URL |
+| `POSTGRES_PASSWORD` | Required by Compose | PostgreSQL bootstrap password |
+| `THREATFADE_APP_DB_USER` | Required by Compose | Application database user |
+| `THREATFADE_APP_DB_PASSWORD` | Required by Compose | Application database password |
 
-The repository now contains a reproducible sustained software-data-plane benchmark at `benchmarks/phase7_benchmark.py` and CI coverage for 10K, 100K and 500K target events/sec. The harness measures canonical event serialization, the existing bounded session window and detection pipeline, throughput, p50/p95/p99 processing latency, RSS and queue/session depth.
+See [Configuration reference](docs/reference/configuration.md) and [`.env.example`](.env.example). Blank example values are placeholders, not usable credentials.
 
-Capture-adapter packet loss, NIC throughput, disk I/O and network I/O require deployment-host benchmarks because synthetic events cannot prove those properties. A 1M events/sec result, if eventually achieved, will be reported only with hardware, software version, workload, duration and loss/latency evidence.
+## Features
 
-No Rust/native/GPU rewrite is introduced without a measured hotspot and an equivalent regression benchmark. See `benchmarks/README.md` and `docs/BUILD_STATUS.md`.
+| Area | Capability | Qualification |
+|---|---|---|
+| Signal analysis | PCAP/PCAPNG ingestion, rolling entropy, z-score analysis | Implemented and tested |
+| Detection | C2 quieting, LOTL gradual fade, GNSS interference scenarios | Synthetic regression coverage |
+| Correlation | Multi-domain temporal correlation | Implemented; association is not causation |
+| Evidence | Structured evidence, confidence context and signed offline packages | Implemented and tested |
+| Analyst workflow | Tenant-scoped inbox, investigations and dispositions | Implemented and tested |
+| Identity | OIDC/JWT, RBAC, tenant isolation and session controls | Repository-tested; live IdP configuration is external |
+| Integrations | Elastic, Sentinel, QRadar, Graylog, Wazuh, MISP, OpenCTI, TheHive and SOAR adapters | Contract-tested; live receiver validation is deployment-specific |
+| Operations | Docker, Kubernetes, health/readiness, observability and recovery tooling | Reference assets and automated validation |
+| Experimental ML | Isolation Forest comparator | Experimental; not authoritative for production detection |
 
-## Phase 8 — Advanced Detection Science
+## Documentation
 
-Phase 8 is an **experimental research track**. The production statistical/fade detector remains authoritative. Candidate ML methods are evaluated offline against a leakage-safe chronological holdout and may only be promoted when they materially outperform the existing baseline and pass calibration, robustness, explainability, provenance, reproducibility and rollback gates.
+Start with the [documentation index](docs/README.md).
 
-The current implementation provides:
+| Need | Documentation |
+|---|---|
+| Architecture and trust boundaries | [Security architecture](docs/SECURITY_ARCHITECTURE.md), [threat model](docs/THREAT_MODEL.md) |
+| Secure deployment | [Secure deployment](docs/SECURE_DEPLOYMENT.md) |
+| Configuration | [Configuration reference](docs/reference/configuration.md) |
+| Detection methodology | [Detection evaluation](docs/DETECTION_EVALUATION.md) |
+| Enterprise integrations | [Enterprise integrations](docs/ENTERPRISE_INTEGRATIONS.md) |
+| Sensor deployment | [Sensor runtime](docs/SENSOR_RUNTIME.md) |
+| Disaster recovery | [Disaster recovery](docs/DISASTER_RECOVERY.md) |
+| Performance methodology | [Benchmark guide](benchmarks/README.md) |
+| Build and assurance status | [Build status](docs/BUILD_STATUS.md), [independent assurance package](docs/evaluation/INDEPENDENT_VALIDATION_PACKAGE.md) |
+| Brand identity | [Brand asset guide](brand/README.md) |
+| GitHub maintainer settings | [Repository settings guide](docs/REPOSITORY_SETTINGS.md) |
 
-- dataset manifests and deterministic provenance digests;
-- chronological train/test separation;
-- benign-only fitting for unsupervised anomaly candidates;
-- statistical-baseline comparison;
-- an experimental Isolation Forest comparator;
-- a conservative promotion gate;
-- CI validation of the experiment machinery.
+## Contributing
 
-GNNs, temporal transformers, self-supervised learning, continual learning and federated learning are **research candidates, not shipped production detectors**. Synthetic CI fixtures validate experiment correctness, not real-world detection superiority. See `docs/PHASE_8_ADVANCED_DETECTION_SCIENCE.md`.
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md), use the issue and pull-request templates, add regression tests for behavior changes, and never include secrets or customer evidence in public submissions.
 
-## Enterprise identity and tenancy
+## License and acknowledgements
 
-- OIDC/JWT validation with issuer, audience, JWKS and time-claim validation.
-- RBAC roles: `viewer`, `analyst`, `api_only`, `admin`, `tenant_admin`.
-- Tenant-scoped detection persistence.
-- Cross-tenant access denied by default.
-- Tenant-admin/platform-admin separation.
-- Production fail-closed authentication.
-- Append-oriented audit events with request and principal context.
-- PostgreSQL production persistence through SQLAlchemy.
-- SQLite development persistence.
-- Investigation case persistence primitives.
-- Offline transport replay state is tenant/sensor scoped and fail-closed on identity mismatch.
+The source files in this repository are licensed under the [Apache License 2.0](LICENSE), unless a file or third-party component states otherwise. The repository describes an open-core product; separately distributed proprietary services or extensions are not automatically licensed by this repository's LICENSE file.
 
-## Security and supply chain
+ThreatFade is developed by Tinlance Limited. The project uses open-source libraries and tools declared in [requirements.txt](requirements.txt) and its container/build workflows. Refer to upstream projects for their respective licenses and attribution requirements.
 
-The repository includes:
+## Support
 
-- Bounded request and PCAP inputs.
-- Rate limiting.
-- Request IDs.
-- Restrictive CORS.
-- Security headers.
-- Finite-number validation.
-- Safe temporary PCAP handling.
-- Non-root container execution.
-- Dropped Linux capabilities.
-- `no-new-privileges`.
-- Kubernetes security context and health probes.
-- Dependabot.
-- CodeQL.
-- Gitleaks.
-- `pip-audit`.
-- SBOM generation.
-- Build provenance/attestation.
-- Keyless Sigstore signing for release images.
-- Ed25519 evidence signatures with explicit key validity/revocation state for offline evidence packages.
+For usage questions and non-sensitive troubleshooting, see [SUPPORT.md](SUPPORT.md). Report suspected vulnerabilities privately using [SECURITY.md](SECURITY.md); do not post exploit details or sensitive evidence in public issues.
 
-## Interoperability
+<details>
+<summary>Roadmap and assurance boundaries</summary>
 
-### Existing/export-compatible formats
+The next major assurance milestone is independent execution of the frozen evaluation and penetration-test packages, followed by controlled field validation. Repository CI is not a substitute for independent detection validation, penetration testing, customer-scale field measurements or formal certification.
 
-ThreatFade retains its existing JSON, Splunk HEC, CEF, CSV, Sigma-compatible, STIX 2.1-compatible, MITRE ATT&CK and FusionOps boundaries.
+See [Build status](docs/BUILD_STATUS.md) and [Phase 20 assurance preparation](docs/PHASE_20_INDEPENDENT_ASSURANCE.md).
 
-### Enterprise integration framework
+</details>
 
-Phase 6 adds one normalized `IntegrationEvent` and one shared delivery transport with bounded retries, backoff, idempotency, TLS/authentication controls, delivery audit and dead-letter handling. Thin adapters are provided for:
+<details>
+<summary>Troubleshooting</summary>
 
-- Elastic / ECS-oriented JSON.
-- Microsoft Sentinel Logs Ingestion-shaped records.
-- IBM QRadar / CEF.
-- Graylog / GELF-shaped JSON.
-- Wazuh alert-shaped JSON.
-- MISP event payloads.
-- OpenCTI GraphQL request envelope.
-- TheHive case-compatible payload.
-- Vendor-neutral SOAR webhook envelope.
+- If the API cannot start, verify the virtual environment and install dependencies from `requirements.txt`.
+- If PostgreSQL is unavailable, use the documented local development path or inspect `THREATFADE_DATABASE_URL`.
+- If production authentication fails, verify issuer, audience, JWKS configuration, clock synchronization and tenant membership.
+- If PCAP processing fails, check file type, configured size/packet/time limits and capture-library availability.
+- For deployment issues, consult [Secure deployment](docs/SECURE_DEPLOYMENT.md).
 
-These adapters are **repository-implemented and contract-tested**. They are not claims of live production connectivity or vendor certification. Target platform versions, routes, authentication, schemas and receiver configuration remain deployment-validation responsibilities. See `docs/ENTERPRISE_INTEGRATIONS.md`.
-
-FusionOps remains an external integration boundary and is not replaced by the enterprise adapter framework.
-
-
-## Brand identity
-
-ThreatFade uses the official **Signal Trace** identity. The official mark sources and token reference are maintained in [brand/assets](brand/assets/), [brand/colors.json](brand/colors.json) and [brand/README.md](brand/README.md). Do not redraw or retype the outlined wordmark.
-
-- Primary navy: `#0B1220`
-- Raised navy: `#16233B`
-- Mist: `#E6EDF3`
-- Signal amber: `#F5A524` (dark surfaces)
-- Signal amber on light: `#C27200`
-
-The dashboard serves its public brand assets from `/assets/brand/`; the FastAPI application mounts this directory independently of authenticated API routes. GitHub's repository-level social preview is configured separately in **Settings → General → Social preview** using the approved 1280×640 dark preview from the official kit.
+</details>

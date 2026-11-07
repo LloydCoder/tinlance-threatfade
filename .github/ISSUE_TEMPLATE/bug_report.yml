@@ -1,0 +1,66 @@
+name: Bug report
+description: Report a reproducible, non-sensitive defect in ThreatFade.
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include credentials, private keys, customer data, PCAPs containing sensitive traffic, or vulnerability exploit details. Use [SECURITY.md](https://github.com/LloydCoder/tinlance-threatfade/blob/main/SECURITY.md) for security reports.
+  - type: input
+    id: version
+    attributes:
+      label: ThreatFade version or commit
+      description: Include the release tag or full/short commit SHA.
+      placeholder: v0.3.0 or 89de437
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, deployment mode and relevant runtime versions.
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the observed behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Configure ...
+        2. Run ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs or screenshots
+      description: Remove tokens, identifiers and customer data before attaching.
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Submission checks
+      options:
+        - label: I searched existing issues.
+          required: true
+        - label: This report contains no secrets or sensitive customer data.
+          required: true
+        - label: This is not a security vulnerability report.
+          required: true
