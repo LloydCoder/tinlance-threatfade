@@ -5,6 +5,7 @@ import os
 import tempfile
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Dict, List, Optional
 
 import yaml
@@ -38,7 +39,8 @@ if ENVIRONMENT == "production" and "*" in allowed_origins:
     raise RuntimeError("Wildcard CORS is forbidden in production")
 
 app = FastAPI(title="ThreatFade API", description="Evasion Interception Platform", version=CONFIG["branding"]["version"], docs_url="/docs", redoc_url="/redoc")
-app.mount("/assets", StaticFiles(directory="dashboard/assets"), name="public-brand-assets")
+BASE_DIR = Path(__file__).resolve().parent
+app.mount("/assets", StaticFiles(directory=str(BASE_DIR / "dashboard" / "assets"), check_dir=False), name="public-brand-assets")
 app.add_middleware(CORSMiddleware, allow_origins=allowed_origins, allow_methods=["GET", "POST", "PATCH", "DELETE"], allow_headers=["Content-Type", "X-API-Key", "Authorization", "X-Request-ID", "X-Tenant-ID", "X-ThreatFade-Session"])
 
 
@@ -220,7 +222,7 @@ def _pcap_to_signals(pcap_path: str, interval_sec: int = 5):
 
 @app.get("/")
 def dashboard():
-    return FileResponse("dashboard/index.html")
+    return FileResponse(str(BASE_DIR / "dashboard" / "index.html"))
 
 
 @app.get("/health")
