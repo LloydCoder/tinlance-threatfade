@@ -12,7 +12,7 @@ These files are sourced from the owner-supplied ThreatFade Signal Trace logo kit
 - Inter is the UI/heading typeface; JetBrains Mono is for code and metrics.
 
 ## Files
-- `threatfade-horizontal-on-dark.svg`: approved full-color horizontal logo for dark UI.
+- `threatfade-mark-on-dark.svg`: approved full-color Signal Trace mark for dark UI.
 - `favicon.svg`: approved browser icon.
 - `site.webmanifest`: PWA identity metadata.
 - `brand.css`: canonical CSS custom properties.
