@@ -1,3 +1,5 @@
+![ThreatFade — signal trace identity](brand/assets/threatfade-horizontal-on-dark.svg)
+
 # ThreatFade
 
 **Evasion Interception Platform** by Tinlance Limited.
@@ -248,3 +250,16 @@ Phase 6 adds one normalized `IntegrationEvent` and one shared delivery transport
 These adapters are **repository-implemented and contract-tested**. They are not claims of live production connectivity or vendor certification. Target platform versions, routes, authentication, schemas and receiver configuration remain deployment-validation responsibilities. See `docs/ENTERPRISE_INTEGRATIONS.md`.
 
 FusionOps remains an external integration boundary and is not replaced by the enterprise adapter framework.
+
+
+## Brand identity
+
+ThreatFade uses the official **Signal Trace** identity. The source logo, icon and color tokens are maintained in [brand/assets](brand/assets/) and [brand/README.md](brand/README.md). Do not redraw or retype the outlined wordmark.
+
+- Primary navy: `#0B1220`
+- Raised navy: `#16233B`
+- Mist: `#E6EDF3`
+- Signal amber: `#F5A524` (dark surfaces)
+- Signal amber on light: `#C27200`
+
+The dashboard serves its public brand assets from `/assets/brand/`; the FastAPI application mounts this directory independently of authenticated API routes. GitHub's repository-level social preview is configured separately in **Settings → General → Social preview** using the approved 1280×640 dark preview from the official kit.
