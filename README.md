@@ -191,6 +191,7 @@ Start with the [documentation index](docs/README.md).
 | Performance methodology | [Benchmark guide](benchmarks/README.md) |
 | Build and assurance status | [Build status](docs/BUILD_STATUS.md), [independent assurance package](docs/evaluation/INDEPENDENT_VALIDATION_PACKAGE.md) |
 | Brand identity | [Brand asset guide](brand/README.md) |
+| GitHub maintainer settings | [Repository settings guide](docs/REPOSITORY_SETTINGS.md) |
 
 ## Contributing
 
