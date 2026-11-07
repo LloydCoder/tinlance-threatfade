@@ -1,108 +1,55 @@
 # Security Policy
 
-## Responsible Disclosure
+ThreatFade is a security-sensitive detection and investigation platform. We welcome responsible reports that help protect users, operators, and the integrity of detection evidence.
 
-If you discover a security vulnerability in ThreatFade, please report it **privately** to:
+## Supported release
 
-📧 **security@tinlance.com** (placeholder – adjust as needed)
+Security fixes are developed against the latest maintained `main` branch and the latest published release, where one exists. Users should upgrade to the latest supported release before requesting assistance with an issue that is already fixed.
 
-**Please do not** open public GitHub issues for security vulnerabilities.
+## Reporting a vulnerability
 
-Include:
-- Description of vulnerability
-- Steps to reproduce
-- Potential impact
-- Suggested fix (if applicable)
+Please report suspected vulnerabilities privately to **security@tinlance.com**.
 
-We will acknowledge receipt within 24 hours and provide updates on our investigation.
+Do not publish exploit details, proof-of-concept payloads, credentials, customer data, packet captures, or other sensitive evidence in public GitHub issues or pull requests.
 
-## Security Best Practices
+Include, where possible:
 
-### For Users
+- Affected version, commit, component, route, or deployment configuration.
+- A concise description of the security impact and relevant trust boundary.
+- Reproduction steps and a minimal proof of concept that does not expose real customer data.
+- Preconditions, required privileges, and whether the issue is remotely exploitable.
+- Relevant logs or artifacts with secrets and personal data removed.
+- A suggested mitigation, if known.
 
-1. **Keep Updated:** Always run the latest version
-   ```bash
-   git pull origin main
-   pip install -r requirements.txt
-   ```
+If a report contains sensitive material, coordinate with the maintainer before sending attachments. Do not send live credentials, private keys, or unredacted customer evidence.
 
-2. **Protect Secrets:**
-   - Use `.env` file for Telegram tokens (never commit)
-   - Rotate bot tokens regularly
-   - Never share chat IDs publicly
+## Response and coordinated disclosure
 
-3. **Safe Configuration:**
-   - Review `config.yaml` before running
-   - Restrict file permissions: `chmod 600 config.yaml`
-   - Use environment variables for sensitive data
+The project aims to acknowledge reports within 24 hours and provide progress updates as triage and remediation proceed. These are response targets, not contractual service levels or guaranteed resolution times.
 
-4. **Validate Data:**
-   - Only analyze data from trusted sources
-   - Verify file integrity before processing
-   - Monitor resource usage on large datasets
+We will work with the reporter to validate the issue, assess severity and affected versions, prepare a fix or mitigation, and coordinate an appropriate disclosure date. Please allow reasonable time for remediation before public disclosure. We will not ask a reporter to access, retain, or disclose data beyond what is necessary to demonstrate the issue safely.
 
-### For Developers
+## Scope and security boundaries
 
-1. **Code Review:**
-   - All PRs require review before merge
-   - Security tests run in CI/CD
-   - Use `bandit` for vulnerability scanning
+Reports are especially useful for issues involving:
 
-2. **Dependencies:**
-   - Pin versions in `requirements.txt`
-   - Regular `pip-audit` checks
-   - Monitor CVE databases
+- Authentication, OIDC/JWT validation, session lifecycle, or account disablement.
+- Authorization, role enforcement, tenant isolation, or cross-tenant data access.
+- Detection, evidence, provenance, audit-log integrity, or offline package verification.
+- PCAP and other hostile-input parsing, resource exhaustion, or unsafe file handling.
+- API abuse, rate limiting, request validation, SSRF, injection, or unsafe integration delivery.
+- Secrets handling, cryptographic key lifecycle, container hardening, CI/CD, dependencies, and release provenance.
 
-3. **Secrets Management:**
-   - Never hardcode tokens or keys
-   - Use environment variables (`os.getenv()`)
-   - Add to `.gitignore` before committing
+Do not test against systems, tenants, accounts, or data that you do not own or have explicit permission to assess. Avoid destructive testing and denial-of-service activity.
 
-4. **Input Validation:**
-   - Validate file paths and inputs
-   - Sanitize external data
-   - Handle errors gracefully
+## Security assurance boundary
 
-## Known Security Considerations
+Automated tests, static analysis, dependency scanning, SBOMs, signatures, and repository controls provide engineering evidence; they do not by themselves establish independent penetration-test coverage, a certification, or a guarantee that the platform is vulnerability-free. Any external assurance must be described separately and supported by its own evidence.
 
-### Current MVP (1.0.0-beta)
+## Public issues
 
-- ✅ No hardcoded secrets
-- ✅ No external cloud dependencies
-- ✅ Offline-first design
-- ⚠️ Telegram bot token must be protected by user
-- ⚠️ File system access required (local reports)
-- ⚠️ No authentication (intended for research/solo use)
-
-### Future (Q2+)
-
-- Multi-user authentication
-- Encrypted data at rest
-- TLS for network communication
-- Rate limiting for API
-- Audit logging
-
-## Vulnerability Tracking
-
-We track security issues in private until resolution, then publish:
-- Post-mortem in security advisory
-- CVE request (if applicable)
-- Patch release with fix
-
-## Security Update Schedule
-
-- **Critical:** Patched within 24-48 hours
-- **High:** Patched within 1 week
-- **Medium:** Patched with next release
-- **Low:** Monitored for next major version
-
-## Contact
-
-- **Security:** security@tinlance.com
-- **GitHub Issues:** For non-security bugs only
-- **PGP Key:** (if applicable, add signing key)
+Use GitHub issues for non-sensitive bugs and feature requests only. If an issue turns out to contain sensitive security details, remove the public exploit material and continue through the private reporting channel.
 
 ---
 
-**Built with security in mind by Tinlance Limited**  
-© 2026 Tinlance Limited
+ThreatFade is developed by Tinlance Limited.
