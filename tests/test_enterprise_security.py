@@ -189,3 +189,24 @@ def test_oidc_validator_rejects_hs256_token():
     with pytest.raises(HTTPException) as exc:
         validator.validate(token)
     assert exc.value.status_code == 401
+
+def test_disabled_identity_account_is_rejected_after_valid_oidc_authentication(monkeypatch):
+    from types import SimpleNamespace
+    import core.identity
+
+    monkeypatch.setenv("THREATFADE_ENV", "production")
+    monkeypatch.setattr(
+        "core.enterprise.OIDC.validate",
+        lambda _token: Principal("disabled-user", "tenant-a", {"analyst"}),
+    )
+    monkeypatch.setattr(
+        core.identity,
+        "ensure_user",
+        lambda *_args, **_kwargs: SimpleNamespace(disabled=1),
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        authenticate(_request({"Authorization": "Bearer cryptographically-valid-token"}))
+
+    assert exc.value.status_code == 403
+    assert exc.value.detail == "Account disabled"
