@@ -1,6 +1,16 @@
 # Changelog
 
-All notable changes to ThreatFade will be documented in this file.
+All notable changes to ThreatFade will be documented in this file. This changelog follows the principles of [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## Unreleased — Documentation and community health
+
+### Changed
+- Reworked the project README around verified installation, usage, configuration and evidence boundaries.
+- Added a navigable documentation index and verified configuration reference.
+- Reconciled contributor guidance, security reporting and public support paths.
+
+### Added
+- Contributor Covenant code of conduct, structured issue forms, pull-request template and LLM-friendly project index.
 
 ## Unreleased — Phase 13 Authenticated Platform
 
