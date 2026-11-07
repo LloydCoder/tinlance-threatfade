@@ -15,6 +15,8 @@ def test_dashboard_uses_official_signal_trace_logo_and_palette() -> None:
     assert "--accent:#F5A524" in html
     assert "#59e1cf" not in html
     assert ">TF</div>" not in html
+    assert "<b>ThreatFade</b>" not in html
+    assert "var(--tf-signal)" in html
 
 
 def test_public_brand_assets_exist_and_manifest_is_consistent() -> None:
